@@ -1,4 +1,4 @@
-# Scriptura
+# Scriptura Lite
 
 Built by the [Nano Collective](https://nanocollective.org) — a community collective building AI tooling not for profit, but for the community.
 
