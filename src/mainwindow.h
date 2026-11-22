@@ -71,11 +71,9 @@ namespace DrawerMetrics {
 constexpr int ExpandedWidth = 320;
 } // namespace DrawerMetrics
 
-class TerminalPanel;
 
 #include "themedefs.h"
 #include "breadcrumbbar.h"
-#include "debugconfiguration.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -367,8 +365,6 @@ protected:
     NotificationCenter *m_notificationCenter;
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
-    TerminalPanel *m_terminalPanel = nullptr;
-    int m_terminalPanelIndex = -1; ///< index into m_panels, for shortcuts
 
     void updateCursorPosition();
     void updateStatusBar();

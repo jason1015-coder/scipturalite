@@ -23,7 +23,6 @@
 #include <QSignalBlocker>
 #include <QStringConverter>
 #include "encodingmanager.h"
-#include "terminal/terminalpanel.h"
 
 namespace {
 // Logical edge of a tab's type icon. Matches the file tree's glyph size so the
@@ -68,9 +67,7 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
     ui->fileTreeView->setRootIndex(rootIndex);
     ui->fileTreeView->hideColumn(1);
 
-    // New terminals open in the project folder rather than the home directory.
-    if (m_terminalPanel)
-        m_terminalPanel->setWorkingDirectory(projectDir);    ui->fileTreeView->hideColumn(2);
+    ui->fileTreeView->hideColumn(2);
     ui->fileTreeView->hideColumn(3);
 
 

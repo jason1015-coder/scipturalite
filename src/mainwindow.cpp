@@ -4,11 +4,7 @@
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
 #include "version.h"
-#include "debugconfiguration.h"
-#include "rundialog.h"
 #include "splitmanager.h"
-#include "terminal/terminalpanel.h"
-#include "terminal/terminalwidget.h"
 #include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
@@ -787,33 +783,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_statusBarWidget->setEncoding("UTF-8");
     m_statusBarWidget->setLineEnding("LF");
     m_statusBarWidget->setIndentation("Spaces: 4");
-
-    // ── Terminal ─────────────────────────────────────────────────────
-    // The shell starts lazily: the panel creates its first session the first
-    // time it is shown, so opening the editor spawns nothing.
-    m_terminalPanel = new TerminalPanel(this);
-    if (!projectDir.isEmpty())
-        m_terminalPanel->setWorkingDirectory(projectDir);
-    m_terminalPanel->hide();
-    m_terminalPanelIndex = registerPanel(":/icons/console.svg", tr("Terminal"),
-                                        tr("Terminal"), true, m_terminalPanel);
-
-    // Ctrl+` toggles the terminal tab, and focuses it rather than merely
-    // selecting it. The terminal is the only panel with a shortcut.
-    auto *terminalShortcut = new QShortcut(QKeySequence("Ctrl+`"), this);
-    connect(terminalShortcut, &QShortcut::activated, this, [this]() {
-        if (m_terminalPanelIndex < 0)
-            return;
-        const int tabIdx = findPanelTabIndex(m_terminalPanelIndex);
-        // Its tab is already the one on screen: put the keyboard back in the shell.
-        if (tabIdx >= 0 && tabBar->currentIndex() == tabIdx
-            && editorStack->currentWidget() == m_terminalPanel) {
-            m_terminalPanel->focusTerminal();
-            return;
-        }
-        openPanelAsTab(m_terminalPanelIndex);
-        m_terminalPanel->focusTerminal();
-    });
 
     // ── Plugins Panel ────────────────────────────────────────────────────
     // Dedicated tab for managing plugins (enable/disable, view details)

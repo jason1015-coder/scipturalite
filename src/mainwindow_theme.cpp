@@ -4,7 +4,6 @@
 #include "version.h"
 #include "thememanager.h"
 #include "themeicons.h"
-#include "terminal/terminalpanel.h"
 #include "rust_adapter.h"
 #include "rust_adapter.h"
 
@@ -673,8 +672,7 @@ void MainWindow::applyThemeDefinition(const ThemeDefinition &def, bool isDark)
 
     // Terminal: text and background follow the editor theme so the panel does
     // not look like a bright box inside a dark window.
-    if (m_terminalPanel)
-        m_terminalPanel->setTerminalColors(def.textColor, def.baseColor);
+
 }
 
 void MainWindow::on_action_theme_triggered()
