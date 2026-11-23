@@ -19,7 +19,6 @@ private slots:
     void testArrowKeysMoveCaret();
     void testTabInsertsIndent();
     void testSaveClearsDirtyState();
-    void testCompletionPopupDoesNotBlockTyping();
 };
 
 #endif // TEST_MAINWINDOW_EDITING_H

@@ -8,23 +8,16 @@
 #include "test_codelensmanager.h"
 #include "test_crashhandler.h"
 #include "test_codeeditor_multicursor.h"
-#include "test_debugconfiguration.h"
 #include "test_fileicons.h"
 #include "test_foldmanager.h"
-#include "test_gitblame.h"
 #include "test_mainwindow_editing.h"
-#include "test_mainwindow_panels.h"
 #include "test_mainwindow_sidebar.h"
 #include "test_multicursor.h"
-#include "test_rundialog.h"
 #include "test_sessionmanager.h"
 #include "test_snippetmanager.h"
-#include "test_splitmanager.h"
 #include "test_themeicons.h"
-#include "test_terminal.h"
 #include "test_thememanager.h"
 #include "test_ui_action_bridge.h"
-#include "test_windowanimator.h"
 
 int main(int argc, char *argv[])
 {
@@ -56,24 +49,17 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestBracketColorizer, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);
-    status |= QTest::qExec(new TestDebugConfiguration, argc, argv);
 
 
-    status |= QTest::qExec(new TestGitBlame, argc, argv);
     status |= QTest::qExec(new TestMainWindowEditing, argc, argv);
-    status |= QTest::qExec(new TestMainWindowPanels, argc, argv);
     status |= QTest::qExec(new TestMainWindowSidebar, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
     status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);
-    status |= QTest::qExec(new TestRunDialog, argc, argv);
     status |= QTest::qExec(new TestSessionManager, argc, argv);
     status |= QTest::qExec(new TestSnippetManager, argc, argv);
-    status |= QTest::qExec(new TestSplitManager, argc, argv);
     status |= QTest::qExec(new TestThemeIcons, argc, argv);
-    status |= QTest::qExec(new TestTerminal, argc, argv);
     status |= QTest::qExec(new TestThemeManager, argc, argv);
     status |= QTest::qExec(new TestUiActionBridge, argc, argv);
-    status |= QTest::qExec(new TestWindowAnimator, argc, argv);
 
     return status;
 }

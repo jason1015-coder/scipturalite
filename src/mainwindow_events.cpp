@@ -163,29 +163,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         }
     }
 
-    // Forward navigation keys to the completion popup when visible
-    if (m_completionPopup && m_completionPopup->isVisible() && event->type() == QEvent::KeyPress) {
-        QKeyEvent *ke = static_cast<QKeyEvent*>(event);
-        switch (ke->key()) {
-            case Qt::Key_Down:
-                m_completionPopup->setCurrentRow(qMin(m_completionPopup->currentRow() + 1, m_completionPopup->count() - 1));
-                return true;
-            case Qt::Key_Up:
-                m_completionPopup->setCurrentRow(qMax(m_completionPopup->currentRow() - 1, 0));
-                return true;
-            case Qt::Key_Return:
-            case Qt::Key_Enter:
-                if (m_completionPopup->currentItem())
-                    emit m_completionPopup->itemActivated(m_completionPopup->currentItem());
-                return true;
-            case Qt::Key_Escape:
-                hideCompletion();
-                return true;
-            default:
-                break;
-        }
-    }
-
     return QMainWindow::eventFilter(watched, event);
 }
 
