@@ -1,11 +1,9 @@
 # Scriptura Lite
 
-Built by the [Nano Collective](https://nanocollective.org) — a community collective building AI tooling not for profit, but for the community.
+A Qt and Rust code editor — Qt for the UI, Rust for safe backend services.
 
-A hybrid Qt and Rust code editor — Qt for the UI, Rust for safe backend services — with a local-first AI assistant built on [Nanocoder](https://github.com/Nano-Collective/nanocoder) still to come.
-
-[![Build & Deploy Scriptura](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml)
-[![Run Unit Tests](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml)
+[![Build & Deploy Scriptura](https://github.com/jason1015-coder/scipturalite/actions/workflows/build.yml/badge.svg)](https://github.com/jason1015-coder/scipturalite/actions/workflows/build.yml)
+[![Run Unit Tests](https://github.com/jason1015-coder/scipturalite/actions/workflows/test.yml/badge.svg)](https://github.com/jason1015-coder/scipturalite/actions/workflows/test.yml)
 
 ![Scriptura preview](./.github/assets/preview.png)
 
@@ -28,8 +26,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 ---
 ### Roadmap
 
-1. `nanocoder` AI assistant (inspector) + inline completion + `AI & Completions` settings
-2. Prod hardening toward `v1`: macOS sign / notarize(maybe)
+1. Prod hardening toward `v1`: macOS sign / notarize(maybe)
 
 ---
 
@@ -247,9 +244,6 @@ See `src/rust_backend/src/plugin_registry.rs` for the registry implementation an
 
 ## Community
 
-Scriptura is built by the [Nano Collective](https://nanocollective.org), a community collective building AI tooling not for profit, but for the community. The work needs a second maintainer as much as it needs code.
+Scriptura is built by Jason.
 
 - **Contribute**: see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and the test gate
-- **The collective**: [nanocollective.org](https://nanocollective.org) · [docs](https://docs.nanocollective.org) · [GitHub](https://github.com/Nano-Collective) · [Discord](https://discord.gg/ktPDV6rekE)
-- **Support the work**: the [Support page](https://docs.nanocollective.org/collective/organisation/support) covers donations and sponsorship
-- **Paid contribution**: the [Economics Charter](https://docs.nanocollective.org/collective/organisation/economics-charter) sets out how scoped paid bounties work
