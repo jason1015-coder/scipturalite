@@ -17,7 +17,6 @@
 #include <QCache>
 #include "multi-cursor.h"
 #include "languageregistry.h"
-#include "gitblame.h"
 #include "codelensmanager.h"
 
 // Standalone LSP types (formerly in LspClient)
@@ -148,11 +147,6 @@ public:
     void setFilePath(const QString &path);
     QString filePath() const { return m_filePath; }
 
-    // Git blame display
-    void setBlameData(const QMap<int, BlameLineInfo> &data) { m_blameData = data; lineNumberArea->update(); }
-    bool blameEnabled() const { return m_blameEnabled; }
-    void setBlameEnabled(bool enabled) { m_blameEnabled = enabled; lineNumberArea->update(); }
-
     // Smart indentation
     void setSmartIndent(bool enabled) { m_smartIndent = enabled; }
     bool smartIndent() const { return m_smartIndent; }
@@ -222,8 +216,6 @@ private:
     SnippetManager *m_snippetManager;
     bool m_bracketColorEnabled = true;
     bool m_smartIndent = true;
-    bool m_blameEnabled = false;
-    QMap<int, BlameLineInfo> m_blameData;
     QString m_filePath;
     QList<CodeLensItem> m_codeLensItems;
 };

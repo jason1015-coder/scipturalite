@@ -9,7 +9,6 @@
 #include <QList>
 
 class CodeEditor;
-class CssBreadcrumbParser;
 
 /**
  * A breadcrumb bar widget that shows:
@@ -26,7 +25,7 @@ public:
     explicit BreadcrumbBarWidget(QWidget *parent = nullptr);
 
     // Update the breadcrumb for a given editor
-    void updateForEditor(CodeEditor *editor, CssBreadcrumbParser *parser = nullptr);
+    void updateForEditor(CodeEditor *editor);
 
     // Clear the breadcrumb
     void clear();

@@ -1450,21 +1450,8 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
             }
 
             // --- Line number (right-aligned in the remaining space) -------
-            // Draw blame annotation if enabled
-            if (m_blameEnabled && m_blameData.contains(blockNumber)) {
-                const BlameLineInfo &info = m_blameData[blockNumber];
-                QFont blameFont = font();
-                blameFont.setPointSize(blameFont.pointSize() - 2);
-                painter.setFont(blameFont);
-                QColor blameColor = palette().color(QPalette::Midlight);
-                blameColor.setAlpha(160);
-                painter.setPen(blameColor);
-                QString blameText = info.author + " " + info.date;
-                painter.drawText(numberX + 4, top, areaWidth - numberX - 4, fontHeight,
-                                Qt::AlignLeft | Qt::AlignVCenter, blameText);
-                painter.setFont(font());
-                painter.setPen(numberPen);
-            }
+            painter.setFont(font());
+            painter.setPen(numberPen);
 
             // Draw Code Lens annotations above the line
             if (!m_codeLensItems.isEmpty()) {

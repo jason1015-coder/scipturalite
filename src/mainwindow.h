@@ -34,21 +34,15 @@
 #include <QHBoxLayout>
 #include <memory>
 #include "codeeditor.h"
-#include "zenmode.h"
 #include "snippetmanager.h"
 #include "sessionmanager.h"
 #include "refactoringmanager.h"
 #include "codelensmanager.h"
-#include "gitblame.h"
 #include "statusbarwidget.h"
 #include "encodingmanager.h"
 #include "notificationcenter.h"
 #include "shortcuteditor.h"
-#include "cssbreadcrumb.h"
 #include "snippeteditordialog.h"
-#include "splitmanager.h"
-#include "customtitlebar.h"
-#include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
@@ -59,8 +53,7 @@
 //            and the sidebar the right, and every control inside the window
 //            (title bar, status bar, panes) mirrors its position to match.
 enum class LayoutType {
-    Classic,
-    Mirrored
+    Classic
 };
 
 // Drawn-out width of the file-tree drawer, pinned on both edges so the layout
@@ -300,9 +293,6 @@ protected:
     RustLspClientAdapter *lspClient;
     int m_previousEditorStackIndex;
     LayoutType m_layoutType = LayoutType::Classic;
-    // Settings → Layout radio group, kept in sync with m_layoutType so the
-    // page stays truthful when the layout changes from the command palette.
-    QButtonGroup *m_layoutButtonGroup = nullptr;
     // In-flight sidebar collapse animations. Tracked so a rapid re-toggle or a
     // layout switch can cancel them — a stale end value would otherwise fight
     // whatever width applyLayout() just decided on.
@@ -314,17 +304,9 @@ protected:
     // member is written by setSidebarCollapsed() and applyLayout() (the startup
     // path) and is the only thing closeEvent() and the toggle consult.
     bool m_sidebarCollapsed = true;
-    // Inspector header pieces, kept so applyPaneMirroring() can swap the close
-    // button and title to the leading edge in the mirrored layout.
-    QHBoxLayout *m_inspectorHeaderLayout = nullptr;
-    QLabel *m_inspectorTitle = nullptr;
-    QPushButton *m_inspectorCloseBtn = nullptr;
-    // The drawer's icon bar, re-aligned when the layout mirrors.
-    QWidget *m_sidebarIconBar = nullptr;
-    
+
     // Debugger
     RustDapClientAdapter *dapClient;
-    std::unique_ptr<DebugConfigurationManager> debugConfigManager;
     bool m_isDebugging;
     bool m_restartRequested = false; // Set when the user wipes settings and chooses to restart
     int m_currentFrameId = 0;
@@ -344,26 +326,19 @@ protected:
     void addRecentFile(const QString &path);
     
     // Modular UI components
-    CustomTitleBar *m_titleBar;
-    WindowAnimator *m_windowAnimator;
     ThemeManager *m_themeManager;
     
     // UI/UX Polish
-    SplitManager *m_splitManager;
-    QWidget *m_inspectorDrawer;
     BreadcrumbBarWidget *m_breadcrumbBar;
     QMetaObject::Connection m_cssBreadcrumbConnection;
 
     // P0/P1/P2/P3 Feature Modules
-    ZenMode *m_zenMode;
     SessionManager *m_sessionManager;
     RefactoringManager *m_refactoringManager;
     CodeLensManager *m_codeLensManager;
-    GitBlame *m_gitBlame;
     StatusBarWidget *m_statusBarWidget;
     EncodingManager *m_encodingManager;
     NotificationCenter *m_notificationCenter;
-    CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
 
     void updateCursorPosition();
@@ -400,10 +375,7 @@ protected:
     void updateFileTreeFolderIcons();
     void cancelSidebarAnimations();
     void applyLayout(LayoutType layout);
-    void setLayoutType(LayoutType layout);
-    void applyPaneMirroring(bool mirrored);
     LayoutType currentLayoutType() const { return m_layoutType; }
-    void toggleInspector();
     void loadRecentProjects();
     void saveRecentProjects();
     void autoSave();

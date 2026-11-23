@@ -1,6 +1,5 @@
 #include "breadcrumbbar.h"
 #include "codeeditor.h"
-#include "cssbreadcrumb.h"
 #include "themeicons.h"
 #include <QFileInfo>
 #include <QDir>
@@ -73,7 +72,7 @@ void BreadcrumbBarWidget::addSegment(const QString &text, const QString &tooltip
     m_segmentsLayout->insertWidget(m_segmentsLayout->count() - 1, segment);
 }
 
-void BreadcrumbBarWidget::updateForEditor(CodeEditor *editor, CssBreadcrumbParser *parser)
+void BreadcrumbBarWidget::updateForEditor(CodeEditor *editor)
 {
     clearSegments();
 
@@ -97,25 +96,6 @@ void BreadcrumbBarWidget::updateForEditor(CodeEditor *editor, CssBreadcrumbParse
 
     for (const QString &part : pathParts) {
         addSegment(part, QString());
-    }
-
-    // For HTML/CSS files, add DOM hierarchy
-    if (parser && editor) {
-        QTextCursor cursor = editor->textCursor();
-        QList<DomBreadcrumbElement> hierarchy = parser->parseDomHierarchy(
-            editor, cursor.blockNumber(), cursor.positionInBlock());
-
-        if (!hierarchy.isEmpty()) {
-            for (const DomBreadcrumbElement &elem : hierarchy) {
-                QString text = elem.tag;
-                if (!elem.id.isEmpty()) text += "#" + elem.id;
-                if (!elem.classes.isEmpty()) {
-                    QString classes = elem.classes;
-                    text += "." + classes.replace(' ', '.');
-                }
-                addSegment(text, QString());
-            }
-        }
     }
 }
 

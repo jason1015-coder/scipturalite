@@ -1,8 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
-#include "customtitlebar.h"
-#include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
@@ -11,9 +9,6 @@
 #include <QKeyEvent>
 #include "internals/settings_store.h"
 #include <QTimer>
-#include <QPropertyAnimation>
-#include <QEasingCurve>
-#include <QAbstractAnimation>
 #include <QProcess>
 
 #ifdef Q_OS_LINUX
@@ -88,20 +83,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             }
         }
         return QMainWindow::eventFilter(watched, event);
-    }
-
-    // Handle title bar dragging via CustomTitleBar
-    if (watched == m_titleBar && m_titleBar) {
-        if (event->type() == QEvent::MouseButtonPress) {
-            m_titleBar->handleMousePress(static_cast<QMouseEvent*>(event));
-            return true;
-        } else if (event->type() == QEvent::MouseMove) {
-            m_titleBar->handleMouseMove(static_cast<QMouseEvent*>(event));
-            return true;
-        } else if (event->type() == QEvent::MouseButtonRelease) {
-            m_titleBar->stopDrag();
-            return true;
-        }
     }
 
     // ── Window resize edges (frameless window support) ────────────
@@ -290,27 +271,6 @@ void MainWindow::enableMicaEffect(HWND hwnd, bool darkMode)
     // Enable dark mode for title bar
     BOOL darkModeEnabled = darkMode ? TRUE : FALSE;
     DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkModeEnabled, sizeof(darkModeEnabled));
-}
-#endif
-
-#ifdef Q_OS_WIN
-
-bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
-{
-    if (eventType == "windows_generic_MSG" || eventType == "windows_dispatcher_MSG") {
-        MSG *msg = static_cast<MSG*>(message);
-        if (msg->message == WM_NCHITTEST) {
-            if (m_titleBar && m_titleBar->isVisible()) {
-                QPoint globalPos(msg->lParam & 0xFFFF, (msg->lParam >> 16) & 0xFFFF);
-                QPoint localPos = m_titleBar->mapFromGlobal(globalPos);
-                if (m_titleBar->rect().contains(localPos)) {
-                    *result = HTCAPTION;
-                    return true;
-                }
-            }
-        }
-    }
-    return QMainWindow::nativeEvent(eventType, message, result);
 }
 #endif
 

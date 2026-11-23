@@ -3,8 +3,6 @@
 #include "codeeditor.h"
 #include "rust_adapter.h"
 #include "themeicons.h"
-#include "rust_adapter.h"
-#include "windowanimator.h"
 
 #include <QFileDialog>
 #include <QFile>
@@ -148,37 +146,6 @@ void MainWindow::on_action_about_triggered()
            "Version: %1\n\n"
            "Built with C++17 and Qt Widgets.\n\n"
            "License: MIT").arg(SCRIPTURA_VERSION));
-}
-
-void MainWindow::toggleInspector()
-{
-    if (!m_inspectorDrawer)
-        return;
-
-    const bool visible = m_inspectorDrawer->width() > 0;
-    const int targetWidth = visible ? 0 : 280;
-
-    QPropertyAnimation *animation = new QPropertyAnimation(m_inspectorDrawer, "maximumWidth", this);
-    animation->setDuration(200);
-    animation->setStartValue(m_inspectorDrawer->width());
-    animation->setEndValue(targetWidth);
-    animation->setEasingCurve(QEasingCurve::InOutCubic);
-
-    connect(animation, &QPropertyAnimation::finished, this, [this, targetWidth]() {
-        if (targetWidth == 0) {
-            m_inspectorDrawer->setMinimumWidth(0);
-            m_inspectorDrawer->setMaximumWidth(0);
-        } else {
-            m_inspectorDrawer->setMinimumWidth(280);
-            m_inspectorDrawer->setMaximumWidth(280);
-        }
-    });
-
-    animation->start(QAbstractAnimation::DeleteWhenStopped);
-
-    if (m_titleBar) {
-        m_titleBar->inspectorToggleButton->setChecked(!visible);
-    }
 }
 
 void MainWindow::showSearchBar(bool show)

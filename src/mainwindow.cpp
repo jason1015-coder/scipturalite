@@ -4,8 +4,6 @@
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
 #include "version.h"
-#include "splitmanager.h"
-#include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
 #include "fileicons.h"
@@ -57,8 +55,6 @@
 #include <QAbstractAnimation>
 #include <QFrame>
 #include <QMenu>
-#include "windowanimator.h"
-#include "thememanager.h"
 
 #ifdef Q_OS_LINUX
 #include <QApplication>
@@ -100,19 +96,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_previousEditorStackIndex(0)
     , dapClient(RustBackend::instance()->dapClient())
 
-    , debugConfigManager(std::make_unique<DebugConfigurationManager>())
     , m_isDebugging(false)
     , m_workspace(RustBackend::instance()->workspace())
-    , m_inspectorDrawer(nullptr)
-    , m_splitManager(new SplitManager(this))
-    , m_zenMode(nullptr)
     , m_sessionManager(nullptr)
-    // Note: created in the init list (not lazily below) because
-    // RefactoringManager is used as a connect() receiver earlier in the
-    // constructor — a null receiver silently discarded the LSP result route.
     , m_refactoringManager(new RefactoringManager(this))
     , m_codeLensManager(nullptr)
-    , m_gitBlame(nullptr)
     , m_statusBarWidget(nullptr)
     , m_encodingManager(nullptr)
     , m_notificationCenter(nullptr)
@@ -136,9 +124,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         if (tabBar)
             updateAllTabIcons();
     });
-    m_windowAnimator = new WindowAnimator(this);
-    m_titleBar = new CustomTitleBar(this);
-    
+
     // Give editor container rounded corners
     ui->editorContainer->setStyleSheet("QWidget#editorContainer { background-color: palette(window); border-radius: 14px; }");
     
@@ -180,16 +166,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     if (centralWidget())
         centralWidget()->setMouseTracking(true);
 
-    connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [this]() {
-        setSidebarCollapsed(!m_sidebarCollapsed);
-    });
-    connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [uiActions]() {
-        uiActions->handle(UiActions::TitlebarInspectorToggle);
-    });
-    connect(m_titleBar, &CustomTitleBar::searchRequested, this, [uiActions](const QString &query) {
-        uiActions->handle(UiActions::TitlebarSearch, {{QStringLiteral("query"), query}});
-    });
-
     // Execute the commands Rust decided:
     connect(uiActions, &UiActionBridge::sidebarToggleRequested, this, [this]() {
         // The settled state lives in m_sidebarCollapsed; the drawer's width is a
@@ -197,28 +173,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         // would make a fast double-toggle flip back to the same state.
         setSidebarCollapsed(!m_sidebarCollapsed);
     });
-    connect(uiActions, &UiActionBridge::inspectorToggleRequested, this, [this]() {
-        toggleInspector();
-    });
     connect(uiActions, &UiActionBridge::settingsOpenRequested, this, [this]() {
         on_action_editor_settings_triggered();
     });    connect(uiActions, &UiActionBridge::actionError, this, [](const QString &action, const QString &error) {
         qWarning() << "[ui-action] rejected:" << action << "—" << error;
     });
-
-
-    // Install title bar as event filter for dragging
-    m_titleBar->installEventFilter(this);
-
-    // Frameless mode is still the app's built-in theme here, but the custom
-    // title bar is implemented now and the platform can paint its own frame.
-    // Remove FriselessWindowHint so standard decorations (traffic-light/min/max/
-    // close buttons, resize edges, alt-tab ordering) work on Windows/Linux/macOS.
-    // (Keep this line in place if you intentionally want a fully custom frame.)
-    m_isFrameless = (windowFlags() & Qt::FramelessWindowHint);
-
-    // Add title bar to editor container layout at the top
-    ui->editorContainerLayout->insertWidget(0, m_titleBar);
 
     // Apply initial theme through ThemeManager
     ThemeManager::Theme initialTheme(
@@ -324,154 +283,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Keep an empty icon bar at the drawer's foot for future quick actions
     QWidget *iconBar = new QWidget(ui->sidebarDrawer);
-    m_sidebarIconBar = iconBar;
     iconBar->setObjectName("sidebarIconBar");
     QHBoxLayout *iconBarLayout = new QHBoxLayout(iconBar);
     iconBarLayout->setContentsMargins(6, 8, 6, 8);
     iconBarLayout->setSpacing(6);
     iconBarLayout->setAlignment(Qt::AlignCenter);
     ui->sidebarDrawerLayout->addWidget(iconBar);
-
-    // --- Right-side Inspector Drawer ---
-    m_inspectorDrawer = new QWidget(this);
-    m_inspectorDrawer->setObjectName("inspectorDrawer");
-    m_inspectorDrawer->setMinimumWidth(0);
-    m_inspectorDrawer->setMaximumWidth(0);
-    m_inspectorDrawer->setVisible(true);
-
-    QVBoxLayout *inspectorLayout = new QVBoxLayout(m_inspectorDrawer);
-    inspectorLayout->setContentsMargins(0, 0, 0, 0);
-    inspectorLayout->setSpacing(0);
-
-    // Header bar
-    QWidget *inspectorHeader = new QWidget(m_inspectorDrawer);
-    inspectorHeader->setObjectName("inspectorHeader");
-    QHBoxLayout *headerLayout = new QHBoxLayout(inspectorHeader);
-    headerLayout->setContentsMargins(12, 8, 8, 8);
-    headerLayout->setSpacing(4);
-    m_inspectorHeaderLayout = headerLayout;
-
-    QLabel *inspectorTitle = new QLabel(tr("Assistant"), inspectorHeader);
-    inspectorTitle->setObjectName("inspectorTitle");
-    QFont titleFont = inspectorTitle->font();
-    titleFont.setPointSize(11);
-    titleFont.setBold(true);
-    inspectorTitle->setFont(titleFont);
-    m_inspectorTitle = inspectorTitle;
-
-    QPushButton *inspectorCloseBtn = new QPushButton(inspectorHeader);
-    inspectorCloseBtn->setObjectName("inspectorCloseBtn");
-    inspectorCloseBtn->setFixedSize(24, 24);
-    ThemeIcons::instance()->setIcon(inspectorCloseBtn, ":/icons/close.svg");
-    inspectorCloseBtn->setFlat(true);
-    inspectorCloseBtn->setCursor(Qt::ArrowCursor);
-    inspectorCloseBtn->setToolTip(tr("Close inspector"));
-    connect(inspectorCloseBtn, &QPushButton::clicked, this, &MainWindow::toggleInspector);
-    m_inspectorCloseBtn = inspectorCloseBtn;
-
-    headerLayout->addWidget(inspectorTitle);
-    headerLayout->addStretch();
-    headerLayout->addWidget(inspectorCloseBtn);
-
-    inspectorLayout->addWidget(inspectorHeader);
-
-    // Separator line
-    QFrame *separator = new QFrame(m_inspectorDrawer);
-    separator->setFrameShape(QFrame::HLine);
-    separator->setFrameShadow(QFrame::Sunken);
-    separator->setObjectName("inspectorSeparator");
-    inspectorLayout->addWidget(separator);
-
-    // Content area
-    QWidget *inspectorContent = new QWidget(m_inspectorDrawer);
-    inspectorContent->setObjectName("inspectorContent");
-    QVBoxLayout *contentLayout = new QVBoxLayout(inspectorContent);
-    contentLayout->setContentsMargins(16, 16, 16, 16);
-    contentLayout->setSpacing(12);
-    contentLayout->setAlignment(Qt::AlignCenter);
-
-    // Sparkle icon placeholder. The logo is full-colour, so it deliberately
-    // bypasses ThemeIcons (which tints). The DPR-aware pixmap() overload is
-    // still used so a HiDPI screen gets a natively-sized bitmap rather than an
-    // upscaled 48px one.
-    QLabel *iconLabel = new QLabel(inspectorContent);
-    iconLabel->setObjectName("assistantIcon");
-    iconLabel->setPixmap(QIcon(":/icons/app-icon.svg").pixmap(
-        QSize(48, 48), qApp ? qApp->devicePixelRatio() : 1.0));
-    iconLabel->setAlignment(Qt::AlignCenter);
-
-    // TODO: nanocoder assistant in here
-    QLabel *aiLabel = new QLabel(tr("AI Assistant is in development"), inspectorContent);
-    aiLabel->setObjectName("aiStatusLabel");
-    aiLabel->setAlignment(Qt::AlignCenter);
-    aiLabel->setWordWrap(true);
-    QFont aiFont = aiLabel->font();
-    aiFont.setPointSize(12);
-    aiLabel->setFont(aiFont);
-
-    QLabel *subtitleLabel = new QLabel(tr("Coming soon — intelligent code assistance, ") +
-                                        tr("refactoring suggestions, and more."), inspectorContent);
-    subtitleLabel->setObjectName("aiSubtitleLabel");
-    subtitleLabel->setAlignment(Qt::AlignCenter);
-    subtitleLabel->setWordWrap(true);
-    QFont subFont = subtitleLabel->font();
-    subFont.setPointSize(10);
-    subtitleLabel->setFont(subFont);
-
-    contentLayout->addStretch();
-    contentLayout->addWidget(iconLabel);
-    contentLayout->addSpacing(8);
-    contentLayout->addWidget(aiLabel);
-    contentLayout->addSpacing(4);
-    contentLayout->addWidget(subtitleLabel);
-    contentLayout->addStretch();
-
-    inspectorLayout->addWidget(inspectorContent, 1);
-
-    // Insert into the main horizontal layout, after editorContainer (index 1), before tabWidget (index 2)
-    QHBoxLayout *mainLayout = qobject_cast<QHBoxLayout*>(ui->centralwidget->layout());
-    if (mainLayout) {
-        mainLayout->insertWidget(2, m_inspectorDrawer);
-    }
-
-    // Apply styles for the inspector drawer
-    m_inspectorDrawer->setStyleSheet(R"(
-        QWidget#inspectorDrawer {
-            background-color: palette(window);
-            border-radius: 14px;
-            border-left: 1px solid palette(mid);
-        }
-        QWidget#inspectorHeader {
-            background-color: transparent;
-            border-bottom: none;
-        }
-        QLabel#inspectorTitle {
-            color: palette(text);
-        }
-        QPushButton#inspectorCloseBtn {
-            border: none;
-            border-radius: 8px;
-            padding: 2px;
-            background-color: transparent;
-        }
-        QPushButton#inspectorCloseBtn:hover {
-            background-color: palette(light);
-        }
-        QFrame#inspectorSeparator {
-            color: palette(mid);
-            max-height: 1px;
-        }
-        QWidget#inspectorContent {
-            background-color: transparent;
-        }
-        QLabel#aiStatusLabel {
-            color: palette(text);
-            font-weight: bold;
-        }
-        QLabel#aiSubtitleLabel {
-            color: palette(midlight);
-        }
-    )");
 
     // Tab bar styling and connections
     tabBar->setTabsClosable(false);
@@ -577,24 +394,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             m_sessionManager->restoreSession();
         });
     }
-
-    // Zen Mode shortcut (Ctrl+Shift+Alt+Z — avoids conflict with Redo Ctrl+Shift+Z)
-    QShortcut *shortcutZenMode = new QShortcut(QKeySequence("Ctrl+Shift+Alt+Z"), this);
-    connect(shortcutZenMode, &QShortcut::activated, this, [this]() {
-        if (!m_zenMode) {
-            m_zenMode = new ZenMode(this, getCurrentCodeEditor(), this);
-        }
-        m_zenMode->setEditor(getCurrentCodeEditor());
-        m_zenMode->toggle();
-    });
-
-    // Escape exits Zen Mode
-    QShortcut *shortcutEscape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
-    connect(shortcutEscape, &QShortcut::activated, this, [this]() {
-        if (m_zenMode && m_zenMode->isActive()) {
-            m_zenMode->exit();
-        }
-    });
 
     // Toggle folding: Ctrl+Shift+[
     QShortcut *shortcutFoldToggle = new QShortcut(QKeySequence("Ctrl+Shift+["), this);
@@ -769,7 +568,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             }
         }
     });
-    m_gitBlame = new GitBlame(this);
     m_statusBarWidget = new StatusBarWidget(this);
     m_encodingManager = new EncodingManager(this);
     m_notificationCenter = new NotificationCenter(this);
@@ -784,9 +582,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_statusBarWidget->setLineEnding("LF");
     m_statusBarWidget->setIndentation("Spaces: 4");
 
-    // P2: CSS Breadcrumb parser
-    m_cssBreadcrumbParser = new CssBreadcrumbParser(this);
-
     // Breadcrumb bar below tab bar
     m_breadcrumbBar = new BreadcrumbBarWidget(ui->editorContainer);
     ui->editorContainerLayout->insertWidget(1, m_breadcrumbBar);
@@ -795,30 +590,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(m_notificationCenter, &NotificationCenter::unreadCountChanged, this, [this](int count) {
         if (m_statusBarWidget) {
             m_statusBarWidget->setErrorCount(count, 0);
-        }
-    });
-
-    // P2: CSS Breadcrumb - update on cursor move for HTML/CSS files
-    // Single connection per editor, managed externally to avoid accumulation
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        if (index < 0 || !m_cssBreadcrumbParser) return;
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor) return;
-        QString path = editor->filePath();
-        if (path.endsWith(".html") || path.endsWith(".css") || path.endsWith(".scss") ||
-            path.endsWith(".xml") || path.endsWith(".svg")) {
-            // Disconnect previous breadcrumb connections first
-            disconnect(m_cssBreadcrumbConnection);
-            // Single connection per tab switch — UniqueConnection prevents duplicates on same editor
-            m_cssBreadcrumbConnection = connect(editor, &QPlainTextEdit::cursorPositionChanged, this, [this, editor]() {
-                QTextCursor cursor = editor->textCursor();
-                QList<DomBreadcrumbElement> hierarchy = m_cssBreadcrumbParser->parseDomHierarchy(
-                    editor, cursor.blockNumber(), cursor.positionInBlock());
-                if (!hierarchy.isEmpty()) {
-                    QString breadcrumb = CssBreadcrumbParser::breadcrumbText(hierarchy);
-                    editor->setToolTip(breadcrumb);
-                }
-            });
         }
     });
 
@@ -902,52 +673,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
 
-    // Git Blame toggle: Ctrl+Shift+G
-    QShortcut *shortcutGitBlame = new QShortcut(QKeySequence("Ctrl+Shift+G"), this);
-    connect(shortcutGitBlame, &QShortcut::activated, this, [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor || !m_gitBlame) return;
-        if (editor->blameEnabled()) {
-            editor->setBlameEnabled(false);
-            editor->setBlameData({});
-        } else {
-            QString path = editor->filePath();
-            if (!path.isEmpty()) {
-                m_gitBlame->requestBlame(path);
-            }
-        }
-    });
-
-    // When blame data arrives, feed it to the matching editor
-    connect(m_gitBlame, &GitBlame::blameReceived, this, [this](const QString &filePath) {
-        // Find the editor that matches the blamed file path
-        CodeEditor *targetEditor = nullptr;
-        for (int i = 0; i < ui->tabWidget->count(); ++i) {
-            CodeEditor *ed = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i));
-            if (ed && ed->filePath() == filePath) {
-                targetEditor = ed;
-                break;
-            }
-        }
-        if (!targetEditor) return;
-        QMap<int, BlameLineInfo> data;
-        for (const BlameLineInfo &info : m_gitBlame->blameForFile()) {
-            data[info.line] = info;
-        }
-        targetEditor->setBlameData(data);
-        targetEditor->setBlameEnabled(true);
-        targetEditor->update();
-    });
-
     // ── Status Bar dynamic updates ────────────────────────────────────────
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         Q_UNUSED(index);
         hideCompletion(); // don't let a stale completion popup follow across tabs
         updateStatusBar();
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (editor && m_gitBlame && m_gitBlame->isEnabled() && !editor->filePath().isEmpty()) {
-            m_gitBlame->requestBlame(editor->filePath());
-        }
     });
 
     // Refactoring shortcuts
@@ -1006,8 +736,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // an unhandled switch branch.
     int storedLayout = SettingsStore::instance()
                            .value("layoutType", static_cast<int>(LayoutType::Classic)).toInt();
-    if (storedLayout < static_cast<int>(LayoutType::Classic) ||
-        storedLayout > static_cast<int>(LayoutType::Mirrored)) {
+    if (storedLayout != static_cast<int>(LayoutType::Classic)) {
         storedLayout = static_cast<int>(LayoutType::Classic);
     }
     applyLayout(static_cast<LayoutType>(storedLayout));
@@ -1029,20 +758,17 @@ MainWindow::~MainWindow()
 void MainWindow::applyLayout(LayoutType layout)
 {
     m_layoutType = layout;
-    const bool mirrored = (layout == LayoutType::Mirrored);
 
     QHBoxLayout *mainLayout = qobject_cast<QHBoxLayout*>(ui->centralwidget->layout());
     if (!mainLayout) return;
 
-    QWidget *sidebar   = ui->sidebarDrawer;
-    QWidget *editor    = ui->editorContainer;
-    QWidget *inspector = m_inspectorDrawer;
-    if (!sidebar || !editor || !inspector) return;
+    QWidget *sidebar = ui->sidebarDrawer;
+    QWidget *editor = ui->editorContainer;
+    if (!sidebar || !editor) return;
 
-    // Detach the three top-level panes so they can be re-ordered in place.
+    // Detach the two top-level panes so they can be re-ordered in place.
     mainLayout->removeWidget(sidebar);
     mainLayout->removeWidget(editor);
-    mainLayout->removeWidget(inspector);
 
     // A collapse animation still in flight would keep writing maximumWidth and
     // undo the width we are about to choose, so drop it first.
@@ -1050,86 +776,23 @@ void MainWindow::applyLayout(LayoutType layout)
     {
         const bool collapsed =
             SettingsStore::instance().value("ui/sidebarCollapsed", true).toBool();
-        // Both edges, not just maximumWidth: the layout hands the drawer its
-        // size hint (the file tree's, ~256px) whenever the maximum does not
-        // bite, so capping alone would leave the drawer narrower than asked.
         const int width = collapsed ? 0 : DrawerMetrics::ExpandedWidth;
         sidebar->setMinimumWidth(width);
         sidebar->setMaximumWidth(width);
-        if (m_titleBar && m_titleBar->sidebarToggleButton)
-            m_titleBar->sidebarToggleButton->setChecked(!collapsed);
-        // applyLayout() is also the startup path for the drawer state, so the
-        // file tree's folder icons have to be re-synced here too.
         m_sidebarCollapsed = collapsed;
         updateFileTreeFolderIcons();
     }
 
-    if (mirrored) {
-        // Inspector takes the left edge, sidebar the right.
-        mainLayout->addWidget(inspector);
-        mainLayout->addWidget(editor, 1);
-        mainLayout->addWidget(sidebar);
-    } else {
-        mainLayout->addWidget(sidebar);
-        mainLayout->addWidget(editor, 1);
-        mainLayout->addWidget(inspector);
-    }
+    mainLayout->addWidget(sidebar);
+    mainLayout->addWidget(editor, 1);
 
     sidebar->show();
     editor->show();
-    inspector->show();
-
-    // ── Mirror every control inside the window ─────────────────────────────
-    // Reversing the panes is only half the job: the chrome around them has to
-    // swap sides too, otherwise the window reads as Classic with a moved panel.
-    if (m_titleBar)
-        m_titleBar->setMirrored(mirrored);
-    if (m_statusBarWidget)
-        m_statusBarWidget->setMirrored(mirrored);
-    applyPaneMirroring(mirrored);
 
     updateTabBarVisibility();
 
-    // Keep the Settings → Layout radios truthful — the layout can also be
-    // switched from the command palette, which bypasses the settings page.
-    if (m_layoutButtonGroup) {
-        QSignalBlocker blocker(m_layoutButtonGroup);
-        if (QAbstractButton *btn = m_layoutButtonGroup->button(static_cast<int>(layout)))
-            btn->setChecked(true);
-    }
-
     mainLayout->activate();
     update();
-}
-
-void MainWindow::applyPaneMirroring(bool mirrored)
-{
-    // The inspector header puts its close button on the trailing edge; when the
-    // inspector sits on the left that edge flips to the left too. Clear every
-    // item first — removeWidget() would leave the spacer behind and each switch
-    // would stack another one, growing the header a little every time.
-    if (m_inspectorHeaderLayout) {
-        while (m_inspectorHeaderLayout->count() > 0)
-            delete m_inspectorHeaderLayout->takeAt(0);
-        if (mirrored) {
-            m_inspectorHeaderLayout->addWidget(m_inspectorCloseBtn);
-            m_inspectorHeaderLayout->addStretch();
-            m_inspectorHeaderLayout->addWidget(m_inspectorTitle);
-        } else {
-            m_inspectorHeaderLayout->addWidget(m_inspectorTitle);
-            m_inspectorHeaderLayout->addStretch();
-            m_inspectorHeaderLayout->addWidget(m_inspectorCloseBtn);
-        }
-    }
-
-    // The drawer's bottom bar (icon bar) is pinned to
-    // the leading edge; mirror it so it hugs the same side as the drawer.
-    const Qt::Alignment barAlign = mirrored ? (Qt::AlignRight | Qt::AlignVCenter)
-                                            : (Qt::AlignLeft | Qt::AlignVCenter);
-    if (m_sidebarIconBar) {
-        ui->sidebarDrawerLayout->removeWidget(m_sidebarIconBar);
-        ui->sidebarDrawerLayout->addWidget(m_sidebarIconBar, 0, barAlign);
-    }
 }
 
 QVariant FileTreeModel::data(const QModelIndex &index, int role) const
@@ -1206,14 +869,6 @@ void MainWindow::cancelSidebarAnimations()
             anim->stop();
     }
     m_sidebarAnims.clear();
-}
-
-void MainWindow::setLayoutType(LayoutType layout)
-{
-    if (layout == m_layoutType)
-        return;
-    SettingsStore::instance().setValue("layoutType", static_cast<int>(layout));
-    applyLayout(layout);
 }
 
 QPlainTextEdit* MainWindow::getCurrentEditor()

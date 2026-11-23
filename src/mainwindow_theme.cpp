@@ -27,6 +27,9 @@
 #include <QToolTip>
 #include <QFileInfo>
 #include <QStandardPaths>
+#include <QPropertyAnimation>
+#include <QEasingCurve>
+#include <QAbstractAnimation>
 
 QWidget* MainWindow::createUnifiedSettingsWidget()
 {
@@ -232,62 +235,6 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
             content, [rebuildCustomThemes]() {
                 rebuildCustomThemes();
             });
-
-    // ── Layout Section ────────────────────────────────────────────────────
-    // The window chrome arrangement. Applying a layout re-parents the panes
-    // live, so the preview is immediate.
-    QGroupBox *layoutGroup = new QGroupBox(tr("Layout"), content);
-    QVBoxLayout *layoutGroupLayout = new QVBoxLayout(layoutGroup);
-    QLabel *layoutHint = new QLabel(
-        tr("Choose how the sidebar, editor, inspector, and bars are arranged."), layoutGroup);
-    layoutHint->setWordWrap(true);
-    layoutGroupLayout->addWidget(layoutHint);
-
-    struct LayoutEntry {
-        LayoutType type;
-        QString name;
-        QString description;
-    };
-    const LayoutEntry layoutEntries[] = {
-        {LayoutType::Classic, tr("Classic"),
-         tr("Sidebar on the left, editor in the middle, inspector on the right.")},
-        {LayoutType::Mirrored, tr("Mirrored"),
-         tr("Fully reversed: the inspector moves left, the sidebar right, and every "
-            "control in the window swaps to the opposite side.")},
-    };
-
-    QButtonGroup *layoutBtnGroup = new QButtonGroup(layoutGroup);
-    m_layoutButtonGroup = layoutBtnGroup;
-    for (int i = 0; i < 2; ++i) {
-        const LayoutEntry &entry = layoutEntries[i];
-        QWidget *row = new QWidget(layoutGroup);
-        QHBoxLayout *rowLayout = new QHBoxLayout(row);
-        rowLayout->setContentsMargins(0, 2, 0, 2);
-        rowLayout->setSpacing(8);
-
-        QRadioButton *radio = new QRadioButton(entry.name, row);
-        radio->setToolTip(entry.description);
-        QLabel *desc = new QLabel(entry.description, row);
-        desc->setWordWrap(true);
-        desc->setEnabled(false); // static explanatory text, not a control
-        rowLayout->addWidget(radio, 0, Qt::AlignTop);
-        rowLayout->addWidget(desc, 1);
-
-        layoutGroupLayout->addWidget(row);
-        layoutBtnGroup->addButton(radio, static_cast<int>(entry.type));
-        if (entry.type == currentLayoutType())
-            radio->setChecked(true);
-    }
-    mainLayout->addWidget(layoutGroup);
-
-    connect(layoutBtnGroup, static_cast<void (QButtonGroup::*)(QAbstractButton*)>(&QButtonGroup::buttonClicked),
-            this, [this, layoutBtnGroup](QAbstractButton *button) {
-        const int id = layoutBtnGroup->id(button);
-        if (id < 0)
-            return;
-        // Persist + re-apply; setLayoutType is a no-op for the active layout.
-        setLayoutType(static_cast<LayoutType>(id));
-    });
 
     connect(themeBtnGroup, static_cast<void (QButtonGroup::*)(QAbstractButton*)>(&QButtonGroup::buttonClicked),
             this, [this, themeButtons](QAbstractButton *button) {
@@ -562,9 +509,6 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
         if (QScrollArea *oldScroll = qobject_cast<QScrollArea*>(unifiedSettingsWidget)) {
             editorStack->removeWidget(oldScroll);
             oldScroll->deleteLater();
-            // The Layout radios die with the old page; drop the pointer so
-            // applyLayout() can't touch it before the new page is built.
-            m_layoutButtonGroup = nullptr;
         }
         unifiedSettingsWidget = createUnifiedSettingsWidget();
         editorStack->addWidget(unifiedSettingsWidget);
@@ -707,10 +651,6 @@ void MainWindow::on_action_license_triggered()
   {
     SettingsStore::instance().setValue("ui/sidebarCollapsed", collapsed);
     m_sidebarCollapsed = collapsed;
-
-    // Keep the title bar toggle in sync with the actual drawer state.
-    if (m_titleBar && m_titleBar->sidebarToggleButton)
-        m_titleBar->sidebarToggleButton->setChecked(!collapsed);
 
     // Drawn out → the file tree lists files straight away, folder glyphs dropped.
     updateFileTreeFolderIcons();
