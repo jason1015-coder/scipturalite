@@ -159,10 +159,6 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
 
-#ifdef Q_OS_WIN
-    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
-#endif
-
  private slots:
     void on_action_open_project_triggered();
     void on_action_save_triggered();
