@@ -177,35 +177,17 @@ protected:
     void on_fileTreeView_clicked(const QModelIndex &index);
     void on_tabWidget_tabCloseRequested(int index);
     void showKeyboardShortcuts();
-    void onEditorTextChanged();
-    void requestHover();
     void onTopTabChanged(int index);
     void rebuildNewTabMenu();
 
  private:
-    void on_action_git_commit_triggered();
-    void on_action_git_push_triggered();
     void on_action_git_pull_triggered();
     void on_action_git_fetch_triggered();
     void on_action_about_triggered();
     void on_action_editor_settings_triggered();
     void on_action_theme_triggered();
     void on_action_license_triggered();
-    void on_action_check_updates_triggered();
-    void on_action_format_document_triggered();
     void on_action_command_palette_triggered();
-    void on_action_go_to_definition_triggered();
-    void on_action_go_to_declaration_triggered();
-    void on_action_go_to_type_definition_triggered();
-    void on_action_go_to_implementation_triggered();
-    void on_action_show_document_symbols_triggered();
-    void on_action_run_debug_triggered();
-    void on_action_stop_debug_triggered();
-    void on_action_step_over_triggered();
-    void on_action_step_into_triggered();
-    void on_action_step_out_triggered();
-    void on_action_continue_debug_triggered();
-    void on_action_toggle_breakpoint_triggered();
     void on_fileTreeView_contextMenu(const QPoint &pos);
 
     /**
@@ -283,11 +265,8 @@ protected:
     QWidget *unifiedSettingsWidget;
 
     QTimer *autoSaveTimer;
-    QTimer *lspDebounceTimer;
-    QTimer *m_hoverTimer;
     QStringList recentProjects;
     int maxRecentProjects = 10;
-    QStringList m_languageServers;
     RustUpdaterAdapter *updater;
     RustConfigValidatorAdapter *configValidator;
     RustLspClientAdapter *lspClient;
@@ -305,24 +284,14 @@ protected:
     // path) and is the only thing closeEvent() and the toggle consult.
     bool m_sidebarCollapsed = true;
 
-    // Debugger
-    RustDapClientAdapter *dapClient;
-    bool m_isDebugging;
-    bool m_restartRequested = false; // Set when the user wipes settings and chooses to restart
-    int m_currentFrameId = 0;
-    QMap<QString, QString> m_breakpointConditions; // key: "file:line"
-    // QPointer so the popup auto-nulls when its owning editor/tab is destroyed.
-    // A raw pointer here dangles -> m_completionPopup->hide()/clear() in
-    // hideCompletion()/onCompletionReceived() dereference freed memory and
-    // segfault whenever the file tab is closed or a new completion arrives.
-    QPointer<QListWidget> m_completionPopup = nullptr;
+    // Set when the user wipes settings and chooses to restart.
+    bool m_restartRequested = false;
     QMap<QString, QString> m_fileEncodings;  // filePath -> encoding name
     QMap<QString, QString> m_fileLineEndings; // filePath -> line ending style
 
     // Workspace & Productivity
     RustWorkspaceAdapter *m_workspace;
     QStringList recentFiles;
-    void openRecentFile(const QString &path);
     void addRecentFile(const QString &path);
     
     // Modular UI components
@@ -346,7 +315,6 @@ protected:
     void updateTabModified(int index, bool modified);
     void updateTopTabBar();
     void updateTabBarVisibility();
-    QIcon createSymbolIcon(QChar symbol) const;
     QPushButton* createTabCloseButton();
     QPushButton* createEditorTabCloseButton(CodeEditor *editor);
     QPushButton* createSettingsTabCloseButton(int tabIndex);
@@ -356,14 +324,6 @@ protected:
     void syncTopBarToCurrentFile();
     QPlainTextEdit* getCurrentEditor();
     QWidget* createUnifiedSettingsWidget();
-    void startLanguageServer(const QString &filePath);
-    void startLanguageServerForProject(const QString &projectPath);
-    void stopLanguageServer();
-    void onDiagnosticsReceived(const QString &uri, const QJsonArray &diagnostics);
-    void onProblemActivated(const QString &fileUri, int line, int column);
-    void onUpdateAvailable(const QString &version, const QString &downloadUrl);
-    void onUpdateCheckFailed(const QString &error);
-    void onTestResultsReceived(const QString &output);
     void showEditorInterface();
     void showSearchBar(bool show);
     void loadProjectDirectory(const QString &dirName);
@@ -380,22 +340,6 @@ protected:
     void saveRecentProjects();
     void autoSave();
     bool checkUnsavedChanges();
-    
-    // Debugger methods
-    void startDebug(const QString &configName);
-    void stopDebug();
-    void loadDebugConfigurations();
-    void onBreakpointToggled(int line, bool enabled);
-    void updateDapBreakpoints();
-    void onCompletionReceived(const QJsonArray &items, int requestId);
-    void hideCompletion();
-    void onDapInitialized();
-    void onDapStopped(const QString &reason);
-    void onDapContinued();
-    void onStackTraceReceived(int threadId, const QJsonArray &frames);
-    void onScopesReceived(int frameId, const QJsonArray &scopes);
-    void onVariablesReceived(int varRef, const QJsonArray &variables);
-    void onDapLogMessage(const QString &msg);
 
     QPalette buildBasePalette(ThemeColorFamily family, ThemeMode mode);
     void updateFamilyButtonPreview(QPushButton *btn, ThemeColorFamily family, ThemeMode mode, ThemeFeatures features);

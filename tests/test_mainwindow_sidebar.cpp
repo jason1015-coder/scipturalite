@@ -6,7 +6,8 @@
 #include <QTreeView>
 
 #include "mainwindow.h"
-#include "customtitlebar.h"
+#include "rust_adapter.h"
+#include "scriptura_actions.h"
 #include "internals/settings_store.h"
 #include "test_mainwindow_sidebar.h"
 
@@ -20,14 +21,13 @@ void seedCollapsedState(bool collapsed)
     SettingsStore::instance().setValue("ui/sidebarCollapsed", collapsed);
 }
 
-// Drive the real user path: the title bar button → CustomTitleBar signal →
-// Rust ui-action bridge → setSidebarCollapsed(). The state settles
-// synchronously; only the width animation is still running afterwards.
+// Drive the real user path: the Rust ui-action bridge → sidebarToggleRequested
+// → setSidebarCollapsed(). The state settles synchronously; only the width
+// animation is still running afterwards.
 void clickDrawerToggle(MainWindow &win)
 {
-    CustomTitleBar *titleBar = win.findChild<CustomTitleBar *>();
-    Q_ASSERT(titleBar && titleBar->sidebarToggleButton);
-    titleBar->sidebarToggleButton->click();
+    Q_UNUSED(win);
+    RustBackend::instance()->uiActions()->handle(UiActions::TitlebarSidebarToggle);
     QCoreApplication::processEvents();
 }
 

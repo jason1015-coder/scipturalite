@@ -77,13 +77,6 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
 
     setWindowTitle(QFileInfo(projectDir).fileName() + " - Scriptura");
 
-    // Initialize LSP for the project directory
-    QString rootUri = QUrl::fromLocalFile(projectDir).toString();
-    if (!lspClient->isRunning()) {
-        // Try to start a language server for the project
-        startLanguageServerForProject(projectDir);
-    }
-
 
 }
 
@@ -297,7 +290,6 @@ void MainWindow::openFileInTab(const QString &fileName)
     CodeEditor *editor = new CodeEditor(this);
     editor->setLanguageForFile(fileName);
     editor->installEventFilter(this);
-    connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
     QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
     editor->setFont(savedFont);
     editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
@@ -324,10 +316,6 @@ void MainWindow::openFileInTab(const QString &fileName)
     });
     // Only one cursorPositionChanged connection: updateStatusBar handles everything
     connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatusBar);
-    connect(editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
-        if (lspClient->isRunning())
-            m_hoverTimer->start();
-    });
 
     openFiles.append({fileName, QFileInfo(fileName).fileName(), false});
     showEditorInterface();
@@ -379,8 +367,7 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         CodeEditor *editor = new CodeEditor(this);
         editor->setLanguageForFile(path);
         editor->installEventFilter(this);
-        connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
-        QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
+            QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
         editor->setFont(savedFont);
         int savedTabWidth = SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt();
         editor->setTabWidth(savedTabWidth);
@@ -402,9 +389,6 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
                     if (i >= 0)
                         updateTabModified(i, m);
                 });
-        connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
-            lspDebounceTimer->start();
-        });
         // Re-arm the idle-debounce auto-save timer on every edit.
         connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
             autoSaveTimer->start();
@@ -430,11 +414,6 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         setWindowTitle(openFile.fileName + " - Scriptura");
         showSearchBar(true);
 
-        // LSP: Open file in language server
-        startLanguageServer(path);
-        QString uri = QUrl::fromLocalFile(path).toString();
-        QString langId = QFileInfo(path).suffix().toLower();
-        lspClient->didOpen(uri, langId, content);
     }
 }
 
@@ -468,9 +447,6 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     if (!closedPath.isEmpty()) {
         m_fileEncodings.remove(closedPath);
         m_fileLineEndings.remove(closedPath);
-        // LSP: Close file in language server
-        QString closedUri = QUrl::fromLocalFile(closedPath).toString();
-        lspClient->didClose(closedUri);
     }
 
     int barIdx = findTabBarIndexForId(closedId);
@@ -783,7 +759,6 @@ void MainWindow::newUntitledFile()
 {
     CodeEditor *editor = new CodeEditor(this);
     editor->installEventFilter(this);
-    connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
     QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
     editor->setFont(savedFont);
     editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
@@ -805,10 +780,6 @@ void MainWindow::newUntitledFile()
     });
     // Only one cursorPositionChanged connection: updateStatusBar handles everything
     connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatusBar);
-    connect(editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
-        if (lspClient->isRunning())
-            m_hoverTimer->start();
-    });
 
     ++m_untitledCounter;
     QString id = QStringLiteral("untitled:%1").arg(m_untitledCounter);

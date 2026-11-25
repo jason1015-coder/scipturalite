@@ -88,15 +88,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , ui(new Ui::MainWindow)
     , selectedTheme(ThemeColorFamily::Default, ThemeMode::Light)
     , autoSaveTimer(new QTimer(this))
-    , lspDebounceTimer(new QTimer(this))
-
     , updater(RustBackend::instance()->updater())
     , configValidator(RustBackend::instance()->configValidator())
     , lspClient(RustBackend::instance()->lspClient())
     , m_previousEditorStackIndex(0)
-    , dapClient(RustBackend::instance()->dapClient())
-
-    , m_isDebugging(false)
     , m_workspace(RustBackend::instance()->workspace())
     , m_sessionManager(nullptr)
     , m_refactoringManager(new RefactoringManager(this))
@@ -327,66 +322,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     autoSaveTimer->setInterval(2000);
     autoSaveTimer->start();
 
-    // LSP debounce timer for text changes
-    lspDebounceTimer->setSingleShot(true);
-    lspDebounceTimer->setInterval(500); // 500ms debounce
-    connect(lspDebounceTimer, &QTimer::timeout, this, &MainWindow::onEditorTextChanged);
-    m_hoverTimer = new QTimer(this);
-    m_hoverTimer->setSingleShot(true);
-    m_hoverTimer->setInterval(350);
-    connect(m_hoverTimer, &QTimer::timeout, this, &MainWindow::requestHover);
 
     QShortcut *shortcutDialog = new QShortcut(QKeySequence("Ctrl+K"), this);
     connect(shortcutDialog, &QShortcut::activated, this, &MainWindow::showKeyboardShortcuts);
 
     QShortcut *shortcutCommandPalette = new QShortcut(QKeySequence("Ctrl+Shift+P"), this);
     connect(shortcutCommandPalette, &QShortcut::activated, this, &MainWindow::on_action_command_palette_triggered);
-
-    QShortcut *shortcutFormat = new QShortcut(QKeySequence("Ctrl+Shift+I"), this);
-    connect(shortcutFormat, &QShortcut::activated, this, &MainWindow::on_action_format_document_triggered);
-
-    QShortcut *shortcutCompletion = new QShortcut(QKeySequence("Ctrl+Space"), this);
-    connect(shortcutCompletion, &QShortcut::activated, this, [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor || currentFile.isEmpty() || !lspClient->isRunning())
-            return;
-        QTextCursor c = editor->textCursor();
-        lspClient->completion(QUrl::fromLocalFile(currentFile).toString(), c.blockNumber(), c.positionInBlock());
-    });
-
-    QShortcut *shortcutSigHelp = new QShortcut(QKeySequence("Ctrl+Shift+Space"), this);
-    connect(shortcutSigHelp, &QShortcut::activated, this, [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor || currentFile.isEmpty() || !lspClient->isRunning())
-            return;
-        QTextCursor c = editor->textCursor();
-        lspClient->signatureHelp(QUrl::fromLocalFile(currentFile).toString(), c.blockNumber(), c.positionInBlock());
-    });
-
-    QShortcut *shortcutDefinition = new QShortcut(QKeySequence("F12"), this);
-    connect(shortcutDefinition, &QShortcut::activated, this, &MainWindow::on_action_go_to_definition_triggered);
-
-    // Debug shortcuts
-    QShortcut *shortcutRunDebug = new QShortcut(QKeySequence("F5"), this);
-    connect(shortcutRunDebug, &QShortcut::activated, this, &MainWindow::on_action_run_debug_triggered);
-
-    QShortcut *shortcutStopDebug = new QShortcut(QKeySequence("Shift+F5"), this);
-    connect(shortcutStopDebug, &QShortcut::activated, this, &MainWindow::on_action_stop_debug_triggered);
-
-    QShortcut *shortcutStepOver = new QShortcut(QKeySequence("F10"), this);
-    connect(shortcutStepOver, &QShortcut::activated, this, &MainWindow::on_action_step_over_triggered);
-
-    QShortcut *shortcutStepInto = new QShortcut(QKeySequence("F11"), this);
-    connect(shortcutStepInto, &QShortcut::activated, this, &MainWindow::on_action_step_into_triggered);
-
-    QShortcut *shortcutStepOut = new QShortcut(QKeySequence("Shift+F11"), this);
-    connect(shortcutStepOut, &QShortcut::activated, this, &MainWindow::on_action_step_out_triggered);
-
-    QShortcut *shortcutContinue = new QShortcut(QKeySequence("Ctrl+F5"), this);
-    connect(shortcutContinue, &QShortcut::activated, this, &MainWindow::on_action_continue_debug_triggered);
-
-    QShortcut *shortcutToggleBreakpoint = new QShortcut(QKeySequence("F9"), this);
-    connect(shortcutToggleBreakpoint, &QShortcut::activated, this, &MainWindow::on_action_toggle_breakpoint_triggered);
 
     // Session restore on startup (after editor is ready)
     if (m_sessionManager && m_sessionManager->hasSavedSession()) {
@@ -460,15 +401,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(shortcutOpenProject, &QShortcut::activated, this, &MainWindow::on_action_open_project_triggered);
 
 
-    // LSP connections
-    connect(lspClient, &RustLspClientAdapter::diagnosticsReceived, this, &MainWindow::onDiagnosticsReceived);
-    connect(lspClient, &RustLspClientAdapter::serverStarted, this, []() {
-        qDebug() << "LSP server started";
-    });
-    connect(lspClient, &RustLspClientAdapter::serverFailed, this, [](const QString &err) {
-        qDebug() << "LSP server failed:" << err;
-    });
-
     // LSP response handlers (definition / declaration / typeDefinition / implementation / references)
     auto jumpToLocation = [this](const QJsonArray &locations) {
         if (locations.isEmpty())
@@ -499,7 +431,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Note: documentSymbol now uses the Rust adapter's completion callback pattern
 
-    connect(lspClient, &RustLspClientAdapter::completionReceived, this, &MainWindow::onCompletionReceived);
     // Route LSP results (rename, code action, etc.) to the RefactoringManager
     connect(lspClient, &RustLspClientAdapter::completionReceived, m_refactoringManager, &RefactoringManager::onLspResultReceived);
 
@@ -535,23 +466,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     });
 
 
-
-    // DAP connections
-    connect(dapClient, &RustDapClientAdapter::initialized, this, &MainWindow::onDapInitialized);
-    connect(dapClient, &RustDapClientAdapter::stopped, this, &MainWindow::onDapStopped);
-    connect(dapClient, &RustDapClientAdapter::continued, this, &MainWindow::onDapContinued);
-    connect(dapClient, &RustDapClientAdapter::stackTraceReceived, this, &MainWindow::onStackTraceReceived);
-    connect(dapClient, &RustDapClientAdapter::scopesReceived, this, &MainWindow::onScopesReceived);
-    connect(dapClient, &RustDapClientAdapter::variablesReceived, this, &MainWindow::onVariablesReceived);
-    connect(dapClient, &RustDapClientAdapter::evaluationReceived, this, [this](const QString &expr, const QString &result) {
-        qDebug() << "DAP eval:" << expr << result;
-    });
-    connect(dapClient, &RustDapClientAdapter::serverFailed, this, [](const QString &err) {
-        qDebug() << "DAP server failed:" << err;
-    });
-
-    // Updater connections
-    connect(updater, &RustUpdaterAdapter::updateAvailable, this, &MainWindow::onUpdateAvailable);
 
     // ── P0/P1/P2 Feature Modules ──────────────────────────────────────
     m_sessionManager = new SessionManager(this, ui->tabWidget, this);
@@ -623,7 +537,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             editor->setLanguageForFile(originalPath);
         }
         editor->installEventFilter(this);
-        connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
         QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
         editor->setFont(savedFont);
         editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
@@ -641,9 +554,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                         updateTabModified(i, m);
                 });
         connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatusBar);
-        connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
-            lspDebounceTimer->start();
-        });
         // Re-arm the idle-debounce auto-save timer on every edit.
         connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
             autoSaveTimer->start();
@@ -676,7 +586,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // ── Status Bar dynamic updates ────────────────────────────────────────
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         Q_UNUSED(index);
-        hideCompletion(); // don't let a stale completion popup follow across tabs
         updateStatusBar();
     });
 
