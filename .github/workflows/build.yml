@@ -6,79 +6,118 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# A newer run on the same ref supersedes an in-flight one.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: '6.8.3'
+  CARGO_CACHE_VERSION: v1
+
 jobs:
   # ── Build Jobs ──────────────────────────────────────────────
 
   build-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
 
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/rust_backend_target
+          key: ${{ runner.os }}-cargo-${{ env.CARGO_CACHE_VERSION }}-${{ hashFiles('src/rust_backend/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.CARGO_CACHE_VERSION }}-
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ qt6-base-dev qt6-svg-dev qt6-tools-dev libqt6sql6-sqlite
+          sudo apt-get install -y cmake g++ zlib1g-dev qt6-base-dev qt6-svg-dev qt6-tools-dev libqt6sql6-sqlite
 
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release -j$(nproc)
+        run: cmake --build build --config Release -j"$(nproc)"
+
+      - name: Verify build output
+        run: test -x build/scriptura
 
       - name: Upload Linux executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-linux-executable
           path: build/scriptura
+          if-no-files-found: error
           retention-days: 14
 
   build-macos:
     runs-on: macos-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
 
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/rust_backend_target
+          key: ${{ runner.os }}-cargo-${{ env.CARGO_CACHE_VERSION }}-${{ hashFiles('src/rust_backend/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.CARGO_CACHE_VERSION }}-
+
       - name: Install Qt
         run: brew install qt
 
       - name: Configure
-        run: cmake -B build -S . -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
+        run: cmake -B build -S . -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
 
       - name: Build
-        run: cmake --build build -j$(sysctl -n hw.ncpu)
-
-      - name: Verify build output
-        run: ls -la build/
+        run: cmake --build build -j"$(sysctl -n hw.ncpu)"
 
       - name: Package app bundle
         run: |
-          if [ ! -d "build/scriptura.app" ] && [ ! -f "build/scriptura.app" ]; then
+          if [ ! -d "build/scriptura.app" ]; then
             echo "Error: scriptura.app not found in build/"
-            find build -maxdepth 4 -name "*.app" -o -type f -executable 2>/dev/null || true
+            ls -la build/
             exit 1
           fi
           tar czf scriptura-macos.tar.gz -C build scriptura.app
 
       - name: Upload macOS app bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-macos-app
           path: scriptura-macos.tar.gz
+          if-no-files-found: error
           retention-days: 14
 
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -91,7 +130,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: ${{ env.QT_VERSION }}
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
@@ -100,29 +139,52 @@ jobs:
       - name: Install vcpkg dependencies
         run: vcpkg install zlib:x64-windows
 
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/rust_backend_target
+          key: ${{ runner.os }}-cargo-${{ env.CARGO_CACHE_VERSION }}-${{ hashFiles('src/rust_backend/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.CARGO_CACHE_VERSION }}-
+
       - name: Configure (MSVC)
-        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_VERBOSE_MAKEFILE=ON
+        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build
-        run: cmake --build build --config Release --verbose -j
+        run: cmake --build build --config Release -j
+
+      - name: Verify build output
+        run: |
+          if (-not (Test-Path "build/Release/scriptura.exe")) {
+            Get-ChildItem -Recurse build -Filter "scriptura.exe" | Format-List
+            throw "build/Release/scriptura.exe was not produced"
+          }
 
       - name: Upload Windows executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-windows-executable
           path: build/Release/scriptura.exe
+          if-no-files-found: error
           retention-days: 14
 
-  # ── Deploy Jobs ─────────────────────────────────────────────
+  # ── Packaging Jobs (push only — pull requests just build) ────
 
   deploy-linux:
     runs-on: ubuntu-latest
     needs: build-linux
+    if: github.event_name == 'push'
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Download Linux executable
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: scriptura-linux-executable
           path: build/
@@ -131,6 +193,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wget file dpkg fakeroot qt6-base-dev qt6-svg-dev libqt6sql6-sqlite
+
+      - name: Determine package version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION="$(git describe --tags --always 2>/dev/null | sed 's/^v//' || true)"
+          [ -n "$VERSION" ] || VERSION="0.0.0-dev"
+          # Debian versions must start with a digit.
+          case "$VERSION" in
+            [0-9]*) ;;
+            *) VERSION="0.0.0+$VERSION" ;;
+          esac
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Download linuxdeploy
         run: |
@@ -151,6 +226,8 @@ jobs:
           ./linuxdeploy-x86_64.AppImage --plugin qt --appdir AppDir --output appimage
 
       - name: Create .deb package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir -p deb-package/DEBIAN
           mkdir -p deb-package/usr/bin
@@ -159,42 +236,46 @@ jobs:
           cp build/scriptura deb-package/usr/bin/
           cp deployment/linux/scriptura.desktop deb-package/usr/share/applications/ || echo "No desktop file found"
           cp src/icon.png deb-package/usr/share/icons/hicolor/256x256/apps/scriptura.png || echo "No icon found"
-          cat > deb-package/DEBIAN/control << EOF
+          cat > deb-package/DEBIAN/control <<EOF
           Package: scriptura
-          Version: 0.0.0-dev
+          Version: ${VERSION}
           Section: editors
           Priority: optional
           Architecture: amd64
           Maintainer: Scriptura <maintainer@example.com>
           Description: A hybrid Qt/Rust text editor with project file browsing
-           Scriptura is a Qt+ Rust text editor with project file browsing capabilities.
-           The Rust backend provides safe protocol handling (LSP, DAP) and infrastructure services.
+           Scriptura is a Qt+Rust text editor with project file browsing capabilities.
+           The Rust backend provides safe protocol handling and infrastructure services.
           Depends: libqt6core6t64, libqt6gui6, libqt6widgets6, libqt6network6, libqt6sql6
           EOF
           dpkg-deb --build deb-package scriptura.deb
 
       - name: Upload Linux AppImage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-linux-appimage
           path: Scriptura*.AppImage
+          if-no-files-found: error
           retention-days: 14
 
       - name: Upload Linux .deb package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-linux-deb
           path: scriptura.deb
+          if-no-files-found: error
           retention-days: 14
 
   deploy-macos:
     runs-on: macos-latest
     needs: build-macos
+    if: github.event_name == 'push'
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download macOS app bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: scriptura-macos-app
           path: ./
@@ -203,7 +284,6 @@ jobs:
         run: |
           mkdir -p build
           tar xzf scriptura-macos.tar.gz -C build
-          ls -la build/
 
       - name: Install Qt
         run: brew install qt
@@ -211,25 +291,44 @@ jobs:
       - name: Bundle Qt dependencies
         run: macdeployqt build/scriptura.app -always-overwrite
 
+      - name: Generate app icon
+        run: |
+          mkdir -p scriptura.iconset
+          sips -z 16 16     src/icon.png --out scriptura.iconset/icon_16x16.png
+          sips -z 32 32     src/icon.png --out scriptura.iconset/icon_16x16@2x.png
+          sips -z 32 32     src/icon.png --out scriptura.iconset/icon_32x32.png
+          sips -z 64 64     src/icon.png --out scriptura.iconset/icon_32x32@2x.png
+          sips -z 128 128   src/icon.png --out scriptura.iconset/icon_128x128.png
+          sips -z 256 256   src/icon.png --out scriptura.iconset/icon_128x128@2x.png
+          sips -z 256 256   src/icon.png --out scriptura.iconset/icon_256x256.png
+          sips -z 512 512   src/icon.png --out scriptura.iconset/icon_256x256@2x.png
+          sips -z 512 512   src/icon.png --out scriptura.iconset/icon_512x512.png
+          sips -z 1024 1024 src/icon.png --out scriptura.iconset/icon_512x512@2x.png
+          iconutil -c icns scriptura.iconset
+          cp scriptura.icns build/scriptura.app/Contents/Resources/
+
       # NOTE: this artifact is unsigned — no Apple Developer account configured.
       # macOS Gatekeeper will refuse to launch it on other Macs.
       - name: Upload macOS app bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-macos-unsigned
           path: build/scriptura.app
+          if-no-files-found: error
           retention-days: 14
 
   deploy-windows:
     runs-on: windows-latest
     needs: build-windows
+    if: github.event_name == 'push'
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Download Windows executable
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: scriptura-windows-executable
           path: build/Release/
@@ -237,7 +336,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: ${{ env.QT_VERSION }}
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
@@ -250,62 +349,80 @@ jobs:
         id: get_version
         shell: pwsh
         run: |
-          $version = git describe --tags --always
-          if ($version -eq "") { $version = "0.0.0-dev" }
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          $version = (git describe --tags --always 2>$null)
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = "0.0.0-dev" }
+          "VERSION=$version" >> $env:GITHUB_OUTPUT
 
       - name: Convert icon to ICO
+        shell: pwsh
         run: |
-          if (Test-Path "src/icon.png") {
+          if (Test-Path "deployment/windows/icon.ico") {
+            Copy-Item deployment/windows/icon.ico icon.ico
+          } elseif (Test-Path "src/icon.png") {
             magick src/icon.png -resize 256x256 icon.ico
           } else {
-            Write-Host "src/icon.png not found, skipping icon conversion"
+            Write-Host "No icon source found, skipping icon conversion"
           }
 
       - name: Deploy Qt dependencies
-        run: |
-          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw build/Release/scriptura.exe
+        run: windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw build/Release/scriptura.exe
 
       - name: Package for installer
+        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path deploy/Release | Out-Null
-          Copy-Item build/Release/scriptura.exe deploy/Release/
-          Copy-Item build/Release/*.dll deploy/Release/
-          Copy-Item -Recurse -Force build/Release/platforms deploy/Release/
-          Copy-Item -Recurse -Force build/Release/styles deploy/Release/
-          Copy-Item -Recurse -Force build/Release/imageformats deploy/Release/
-          if (Test-Path src/resources) { Copy-Item -Recurse -Force src/resources deploy/Release/resources }
-          Copy-Item icon.ico deploy/Release/
-          Copy-Item LICENSE deploy/Release/
+          $src = "build/Release"
+          $dst = "deploy/Release"
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Copy-Item "$src/scriptura.exe" $dst
+          Get-ChildItem $src -Filter *.dll -ErrorAction SilentlyContinue | Copy-Item -Destination $dst
+          foreach ($dir in @("platforms", "styles", "imageformats", "iconengines", "tls", "networkinformation")) {
+            if (Test-Path "$src/$dir") { Copy-Item -Recurse -Force "$src/$dir" $dst }
+          }
+          if (Test-Path "src/resources") { Copy-Item -Recurse -Force src/resources "$dst/resources" }
+          if (Test-Path "icon.ico") { Copy-Item icon.ico $dst }
+          Copy-Item LICENSE $dst
 
       - name: Build NSIS installer
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          cd deploy\Release
-          $nsiContent = Get-Content "$env:GITHUB_WORKSPACE\deployment\windows\scriptura.nsi"
-          $nsiContent = $nsiContent -replace '0\.0\.0-dev', '${{ steps.get_version.outputs.VERSION }}'
-          Set-Content scriptura-temp.nsi $nsiContent
-          if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            makensis scriptura-temp.nsi
-          } else {
-            $makensis = Get-ChildItem 'C:\Program Files','C:\Program Files (x86)','C:\ProgramData' -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $makensis) { throw "makensis.exe not found. Install NSIS via choco or manually." }
-            & $makensis.FullName scriptura-temp.nsi
+          Push-Location deploy/Release
+          try {
+            $nsi = Get-Content "$env:GITHUB_WORKSPACE/deployment/windows/scriptura.nsi" -Raw
+            $nsi = $nsi.Replace('0.0.0-dev', $env:APP_VERSION)
+            Set-Content -Path scriptura-temp.nsi -Value $nsi
+
+            $makensis = Get-Command makensis -ErrorAction SilentlyContinue
+            if (-not $makensis) {
+              $found = Get-ChildItem 'C:\Program Files','C:\Program Files (x86)','C:\ProgramData' -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $found) { throw "makensis.exe not found. Install NSIS via choco or manually." }
+              $makensis = $found.FullName
+            } else {
+              $makensis = $makensis.Source
+            }
+
+            & $makensis scriptura-temp.nsi
+            if ($LASTEXITCODE -ne 0) { throw "makensis failed with exit code $LASTEXITCODE" }
+          } finally {
+            Pop-Location
           }
 
       - name: Create portable ZIP
-        run: |
-          Compress-Archive -Path deploy\Release\* -DestinationPath Scriptura-Portable.zip
+        run: Compress-Archive -Path deploy/Release/* -DestinationPath Scriptura-Portable.zip
 
       - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-windows-installer
           path: deploy/Release/Scriptura-Setup.exe
+          if-no-files-found: error
           retention-days: 14
 
       - name: Upload Windows portable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scriptura-windows-portable
           path: Scriptura-Portable.zip
+          if-no-files-found: error
           retention-days: 14

@@ -24,33 +24,36 @@ jobs:
   update-dev-release:
     name: Update scriptura-dev release
     runs-on: ubuntu-latest
-    # Only act on pushed commits (main/master). PR-triggered runs are ignored.
+    timeout-minutes: 30
+    # Only act on pushed commits. PR-triggered runs are ignored.
     if: github.event.workflow_run.event == 'push'
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       # ── Gate: deploy must have passed ──
-      # This workflow is triggered by deploy completion; check conclusion.
       - name: Check deploy passed
         id: gate
         env:
           DEPLOY_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
-          set -e
+          set -euo pipefail
           echo "Deploy conclusion=$DEPLOY_CONCLUSION"
           if [ "$DEPLOY_CONCLUSION" != "success" ]; then
-            echo "::warning Deploy did not pass ($DEPLOY_CONCLUSION); skipping."
+            echo "::warning::Deploy did not pass ($DEPLOY_CONCLUSION); skipping dev release."
             echo "gated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "::notice Deploy passed. Publishing dev release."
-          echo "gated=true"  >> "$GITHUB_OUTPUT"
+          echo "::notice::Deploy passed. Publishing dev release."
+          echo "gated=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        if: steps.gate.outputs.gated == 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
       # ── Download ALL artifacts produced by the deploy run ──
       - name: Download deploy artifacts
         if: steps.gate.outputs.gated == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -60,30 +63,28 @@ jobs:
       - name: Stage release assets
         if: steps.gate.outputs.gated == 'true'
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p release-assets
 
-          package_dir() {
-            local dir="$1" dest="$2"
-            [ -d "$dir" ] || return 0
-            local name; name="$(basename "$dir")"
-            ( cd "$dir" && zip -r -q "$OLDPWD/${dest}/${name}.zip" . )
-            echo "Staged ${dest}/${name}.zip"
-          }
-
-          for dir in build-artifacts/*/; do package_dir "$dir" release-assets; done
+          shopt -s nullglob
+          for dir in build-artifacts/*/; do
+            name="$(basename "$dir")"
+            ( cd "$dir" && zip -q -r "$GITHUB_WORKSPACE/release-assets/${name}.zip" . )
+            echo "Staged release-assets/${name}.zip"
+          done
 
           echo "=== Release assets ==="
           ls -la release-assets/
 
       # ── Create or UPDATE the dev tag / scriptura-dev release ──
-      # Fixed tag name => an existing release is updated and the git tag is
-      # force-moved to this commit — never a brand-new tag.
+      # Fixed tag name => the existing release is updated in place; the tag is
+      # created against the commit that was actually deployed.
       - name: Create/update dev release
         if: steps.gate.outputs.gated == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: dev
+          target_commitish: ${{ github.event.workflow_run.head_sha }}
           name: scriptura-dev
           body: |
             Rolling development build (auto-generated).
