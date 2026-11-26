@@ -65,6 +65,12 @@ jobs:
           name: scriptura-linux-executable
           path: build/
 
+      # Artifacts do not carry file modes, so the downloaded binary is 0644.
+      # linuxdeploy turns it into AppRun and appimagetool then rejects the
+      # AppDir, and dpkg-deb would ship a .deb binary nobody can execute.
+      - name: Restore executable permission
+        run: chmod +x build/scriptura
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -182,6 +188,8 @@ jobs:
           sips -z 512 512   src/icon.png --out scriptura.iconset/icon_512x512.png
           sips -z 1024 1024 src/icon.png --out scriptura.iconset/icon_512x512@2x.png
           iconutil -c icns scriptura.iconset
+          # A CMake bundle has no Contents/Resources until something lands there.
+          mkdir -p build/scriptura.app/Contents/Resources
           cp scriptura.icns build/scriptura.app/Contents/Resources/
 
       # NOTE: this artifact is unsigned — no Apple Developer account configured.
