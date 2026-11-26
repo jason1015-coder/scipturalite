@@ -69,13 +69,18 @@ jobs:
       - name: Generate coverage report
         run: |
           # lcov 2.x reports "inconsistent" (a line is hit but none of its
-          # branches were evaluated) for template code in libstdc++ headers;
-          # that is not an error in this project's own sources.
+          # branches were evaluated) for template code in libstdc++ headers and
+          # in MainWindow's constructor. It re-runs the same consistency checks
+          # every time it reads a tracefile back, so every lcov invocation in
+          # this step needs the same ignore list -- otherwise --remove/--list
+          # abort on the tracefile --capture just wrote. None of these are
+          # errors in this project's own sources.
+          IGNORE=mismatch,gcov,source,inconsistent
           lcov --capture --directory build --output-file coverage.info \
-            --rc branch_coverage=1 --ignore-errors mismatch,gcov,source,inconsistent
+            --rc branch_coverage=1 --ignore-errors "$IGNORE"
           lcov --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.info \
-            --rc branch_coverage=1 --ignore-errors unused
-          lcov --list coverage.info --rc branch_coverage=1
+            --rc branch_coverage=1 --ignore-errors "$IGNORE,unused"
+          lcov --list coverage.info --rc branch_coverage=1 --ignore-errors "$IGNORE"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v7

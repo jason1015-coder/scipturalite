@@ -351,7 +351,7 @@ jobs:
           setup-python: 'true'
 
       - name: Install NSIS and ImageMagick
-        run: choco install nsis imagemagick -y
+        run: choco install nsis imagemagick -y --no-progress
 
       - name: Get version from git tag
         id: get_version
@@ -367,10 +367,14 @@ jobs:
           if (Test-Path "deployment/windows/icon.ico") {
             Copy-Item deployment/windows/icon.ico icon.ico
           } elseif (Test-Path "src/icon.png") {
-            magick src/icon.png -resize 256x256 icon.ico
+            # A plain 256x256 resize makes ImageMagick emit a single
+            # PNG-compressed entry, which some makensis builds refuse. Emitting
+            # the usual sizes keeps every entry in the classic ICO format.
+            magick src/icon.png -background none -define icon:auto-resize=256,128,64,48,32,16 icon.ico
           } else {
             Write-Host "No icon source found, skipping icon conversion"
           }
+          if (Test-Path "icon.ico") { Get-Item icon.ico | Format-List Name,Length }
 
       - name: Deploy Qt dependencies
         run: windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw build/Release/scriptura.exe
@@ -395,23 +399,44 @@ jobs:
         env:
           APP_VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Chocolatey does not always put makensis on PATH, and searching all
+          # of Program Files for it took minutes before failing. Check the known
+          # install locations, and fail fast with a usable message.
+          function Find-Makensis {
+            return @(
+              (Get-Command makensis -ErrorAction SilentlyContinue).Source,
+              "$env:ProgramFiles\NSIS\makensis.exe",
+              "${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+              "$env:ProgramData\chocolatey\bin\makensis.exe"
+            ) | Where-Object { $_ -and (Test-Path -Path $_) } | Select-Object -First 1
+          }
+
+          $makensis = Find-Makensis
+          if (-not $makensis) {
+            Write-Host "makensis not on PATH or in the usual locations; reinstalling NSIS."
+            choco install nsis -y --no-progress --force
+            $makensis = Find-Makensis
+          }
+          if (-not $makensis) {
+            throw "makensis.exe not found. NSIS did not install correctly."
+          }
+          Write-Host "Using makensis: $makensis"
+          & $makensis /VERSION
+          if ($LASTEXITCODE -ne 0) { throw "makensis -VERSION failed with exit code $LASTEXITCODE" }
+
           Push-Location deploy/Release
           try {
             $nsi = Get-Content "$env:GITHUB_WORKSPACE/deployment/windows/scriptura.nsi" -Raw
             $nsi = $nsi.Replace('0.0.0-dev', $env:APP_VERSION)
             Set-Content -Path scriptura-temp.nsi -Value $nsi
 
-            $makensis = Get-Command makensis -ErrorAction SilentlyContinue
-            if (-not $makensis) {
-              $found = Get-ChildItem 'C:\Program Files','C:\Program Files (x86)','C:\ProgramData' -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-              if (-not $found) { throw "makensis.exe not found. Install NSIS via choco or manually." }
-              $makensis = $found.FullName
-            } else {
-              $makensis = $makensis.Source
-            }
-
             & $makensis scriptura-temp.nsi
             if ($LASTEXITCODE -ne 0) { throw "makensis failed with exit code $LASTEXITCODE" }
+            if (-not (Test-Path "Scriptura-Setup.exe")) {
+              throw "makensis reported success but produced no Scriptura-Setup.exe"
+            }
           } finally {
             Pop-Location
           }
