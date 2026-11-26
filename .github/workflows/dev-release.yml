@@ -25,8 +25,13 @@ jobs:
     name: Update scriptura-dev release
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Only act on pushed commits. PR-triggered runs are ignored.
-    if: github.event.workflow_run.event == 'push'
+    # deploy.yml only runs on workflow_dispatch, so the previous
+    # `event == 'push'` filter never matched and this job was always skipped.
+    # Match the event the manual deploy actually reports, and only publish
+    # builds of main so a dispatch on a feature branch cannot move the dev tag.
+    if: >-
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_branch == 'main'
     steps:
       # ── Gate: deploy must have passed ──
       - name: Check deploy passed
