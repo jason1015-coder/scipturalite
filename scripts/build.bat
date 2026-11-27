@@ -39,5 +39,5 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo Build complete. Run with: %BUILD_DIR%\scriptura.exe
+echo Build complete. Run with: %BUILD_DIR%\scriptura-lite.exe
 echo.

@@ -5,17 +5,17 @@
     <key>CFBundleIdentifier</key>
     <string>com.scriptura.app</string>
     <key>CFBundleName</key>
-    <string>Scriptura</string>
+    <string>Scriptura Lite</string>
     <key>CFBundleDisplayName</key>
-    <string>Scriptura</string>
+    <string>Scriptura Lite</string>
     <key>CFBundleVersion</key>
     <string>@SCRIPTURA_VERSION@</string>
     <key>CFBundleShortVersionString</key>
     <string>@SCRIPTURA_VERSION@</string>
     <key>CFBundleExecutable</key>
-    <string>scriptura</string>
+    <string>scriptura-lite</string>
     <key>CFBundleIconFile</key>
-    <string>scriptura</string>
+    <string>scriptura-lite</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
     <key>NSHighResolutionCapable</key>

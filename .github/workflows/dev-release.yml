@@ -5,7 +5,7 @@ name: Dev Release (update dev tag)
 # This workflow is lazy: it does NOT start on every push. Instead it triggers
 # ONLY when "Deploy Scriptura (Manual)" workflow COMPLETES.
 # If deploy passed -> it immediately creates/updates the "dev" tag /
-# "scriptura-dev" release with every artifact. If it failed it does nothing.
+# "scriptura-lite-dev" release with every artifact. If it failed it does nothing.
 
 on:
   workflow_run:
@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   update-dev-release:
-    name: Update scriptura-dev release
+    name: Update scriptura-lite-dev release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Only act on pushed commits. PR-triggered runs are ignored.
@@ -76,7 +76,7 @@ jobs:
           echo "=== Release assets ==="
           ls -la release-assets/
 
-      # ── Create or UPDATE the dev tag / scriptura-dev release ──
+      # ── Create or UPDATE the dev tag / scriptura-lite-dev release ──
       # Fixed tag name => the existing release is updated in place; the tag is
       # created against the commit that was actually deployed.
       - name: Create/update dev release
@@ -85,7 +85,7 @@ jobs:
         with:
           tag_name: dev
           target_commitish: ${{ github.event.workflow_run.head_sha }}
-          name: scriptura-dev
+          name: scriptura-lite-dev
           body: |
             Rolling development build (auto-generated).
 

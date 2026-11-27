@@ -55,13 +55,13 @@ jobs:
         run: cmake --build build --config Release -j"$(nproc)"
 
       - name: Verify build output
-        run: test -x build/scriptura
+        run: test -x build/scriptura-lite
 
       - name: Upload Linux executable
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-linux-executable
-          path: build/scriptura
+          name: scriptura-lite-linux-executable
+          path: build/scriptura-lite
           if-no-files-found: error
           retention-days: 14
 
@@ -98,18 +98,18 @@ jobs:
 
       - name: Package app bundle
         run: |
-          if [ ! -d "build/scriptura.app" ]; then
-            echo "Error: scriptura.app not found in build/"
+          if [ ! -d "build/scriptura-lite.app" ]; then
+            echo "Error: scriptura-lite.app not found in build/"
             ls -la build/
             exit 1
           fi
-          tar czf scriptura-macos.tar.gz -C build scriptura.app
+          tar czf scriptura-lite-macos.tar.gz -C build scriptura-lite.app
 
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-macos-app
-          path: scriptura-macos.tar.gz
+          name: scriptura-lite-macos-app
+          path: scriptura-lite-macos.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -158,16 +158,16 @@ jobs:
 
       - name: Verify build output
         run: |
-          if (-not (Test-Path "build/Release/scriptura.exe")) {
-            Get-ChildItem -Recurse build -Filter "scriptura.exe" | Format-List
-            throw "build/Release/scriptura.exe was not produced"
+          if (-not (Test-Path "build/Release/scriptura-lite.exe")) {
+            Get-ChildItem -Recurse build -Filter "scriptura-lite.exe" | Format-List
+            throw "build/Release/scriptura-lite.exe was not produced"
           }
 
       - name: Upload Windows executable
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-windows-executable
-          path: build/Release/scriptura.exe
+          name: scriptura-lite-windows-executable
+          path: build/Release/scriptura-lite.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -186,14 +186,14 @@ jobs:
       - name: Download Linux executable
         uses: actions/download-artifact@v8
         with:
-          name: scriptura-linux-executable
+          name: scriptura-lite-linux-executable
           path: build/
 
       # Artifacts do not carry file modes, so the downloaded binary is 0644.
       # linuxdeploy turns it into AppRun and appimagetool then rejects the
       # AppDir, and dpkg-deb would ship a .deb binary nobody can execute.
       - name: Restore executable permission
-        run: chmod +x build/scriptura
+        run: chmod +x build/scriptura-lite
 
       - name: Install system dependencies
         run: |
@@ -224,9 +224,9 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp build/scriptura AppDir/usr/bin/
-          cp deployment/linux/scriptura.desktop AppDir/usr/share/applications/ || echo "No desktop file found"
-          cp src/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/scriptura.png || echo "No icon found"
+          cp build/scriptura-lite AppDir/usr/bin/
+          cp deployment/linux/scriptura-lite.desktop AppDir/usr/share/applications/ || echo "No desktop file found"
+          cp src/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/scriptura-lite.png || echo "No icon found"
           export APPIMAGE_EXTRACT_AND_RUN=1
           export QMAKE=/usr/bin/qmake6
           ./linuxdeploy-x86_64.AppImage --plugin qt --appdir AppDir --output appimage
@@ -239,27 +239,27 @@ jobs:
           mkdir -p deb-package/usr/bin
           mkdir -p deb-package/usr/share/applications
           mkdir -p deb-package/usr/share/icons/hicolor/256x256/apps
-          cp build/scriptura deb-package/usr/bin/
-          cp deployment/linux/scriptura.desktop deb-package/usr/share/applications/ || echo "No desktop file found"
-          cp src/icon.png deb-package/usr/share/icons/hicolor/256x256/apps/scriptura.png || echo "No icon found"
+          cp build/scriptura-lite deb-package/usr/bin/
+          cp deployment/linux/scriptura-lite.desktop deb-package/usr/share/applications/ || echo "No desktop file found"
+          cp src/icon.png deb-package/usr/share/icons/hicolor/256x256/apps/scriptura-lite.png || echo "No icon found"
           cat > deb-package/DEBIAN/control <<EOF
-          Package: scriptura
+          Package: scriptura-lite
           Version: ${VERSION}
           Section: editors
           Priority: optional
           Architecture: amd64
-          Maintainer: Scriptura <maintainer@example.com>
+          Maintainer: Scriptura Lite <maintainer@example.com>
           Description: A hybrid Qt/Rust text editor with project file browsing
-           Scriptura is a Qt+Rust text editor with project file browsing capabilities.
+           Scriptura Lite is a Qt+Rust text editor with project file browsing capabilities.
            The Rust backend provides safe protocol handling and infrastructure services.
           Depends: libqt6core6t64, libqt6gui6, libqt6widgets6, libqt6network6, libqt6sql6
           EOF
-          dpkg-deb --build deb-package scriptura.deb
+          dpkg-deb --build deb-package scriptura-lite.deb
 
       - name: Upload Linux AppImage
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-linux-appimage
+          name: scriptura-lite-linux-appimage
           path: Scriptura*.AppImage
           if-no-files-found: error
           retention-days: 14
@@ -267,8 +267,8 @@ jobs:
       - name: Upload Linux .deb package
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-linux-deb
-          path: scriptura.deb
+          name: scriptura-lite-linux-deb
+          path: scriptura-lite.deb
           if-no-files-found: error
           retention-days: 14
 
@@ -283,45 +283,45 @@ jobs:
       - name: Download macOS app bundle
         uses: actions/download-artifact@v8
         with:
-          name: scriptura-macos-app
+          name: scriptura-lite-macos-app
           path: ./
 
       - name: Extract app bundle
         run: |
           mkdir -p build
-          tar xzf scriptura-macos.tar.gz -C build
+          tar xzf scriptura-lite-macos.tar.gz -C build
 
       - name: Install Qt
         run: brew install qt
 
       - name: Bundle Qt dependencies
-        run: macdeployqt build/scriptura.app -always-overwrite
+        run: macdeployqt build/scriptura-lite.app -always-overwrite
 
       - name: Generate app icon
         run: |
-          mkdir -p scriptura.iconset
-          sips -z 16 16     src/icon.png --out scriptura.iconset/icon_16x16.png
-          sips -z 32 32     src/icon.png --out scriptura.iconset/icon_16x16@2x.png
-          sips -z 32 32     src/icon.png --out scriptura.iconset/icon_32x32.png
-          sips -z 64 64     src/icon.png --out scriptura.iconset/icon_32x32@2x.png
-          sips -z 128 128   src/icon.png --out scriptura.iconset/icon_128x128.png
-          sips -z 256 256   src/icon.png --out scriptura.iconset/icon_128x128@2x.png
-          sips -z 256 256   src/icon.png --out scriptura.iconset/icon_256x256.png
-          sips -z 512 512   src/icon.png --out scriptura.iconset/icon_256x256@2x.png
-          sips -z 512 512   src/icon.png --out scriptura.iconset/icon_512x512.png
-          sips -z 1024 1024 src/icon.png --out scriptura.iconset/icon_512x512@2x.png
-          iconutil -c icns scriptura.iconset
+          mkdir -p scriptura-lite.iconset
+          sips -z 16 16     src/icon.png --out scriptura-lite.iconset/icon_16x16.png
+          sips -z 32 32     src/icon.png --out scriptura-lite.iconset/icon_16x16@2x.png
+          sips -z 32 32     src/icon.png --out scriptura-lite.iconset/icon_32x32.png
+          sips -z 64 64     src/icon.png --out scriptura-lite.iconset/icon_32x32@2x.png
+          sips -z 128 128   src/icon.png --out scriptura-lite.iconset/icon_128x128.png
+          sips -z 256 256   src/icon.png --out scriptura-lite.iconset/icon_128x128@2x.png
+          sips -z 256 256   src/icon.png --out scriptura-lite.iconset/icon_256x256.png
+          sips -z 512 512   src/icon.png --out scriptura-lite.iconset/icon_256x256@2x.png
+          sips -z 512 512   src/icon.png --out scriptura-lite.iconset/icon_512x512.png
+          sips -z 1024 1024 src/icon.png --out scriptura-lite.iconset/icon_512x512@2x.png
+          iconutil -c icns scriptura-lite.iconset
           # A CMake bundle has no Contents/Resources until something lands there.
-          mkdir -p build/scriptura.app/Contents/Resources
-          cp scriptura.icns build/scriptura.app/Contents/Resources/
+          mkdir -p build/scriptura-lite.app/Contents/Resources
+          cp scriptura-lite.icns build/scriptura-lite.app/Contents/Resources/
 
       # NOTE: this artifact is unsigned — no Apple Developer account configured.
       # macOS Gatekeeper will refuse to launch it on other Macs.
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-macos-unsigned
-          path: build/scriptura.app
+          name: scriptura-lite-macos-unsigned
+          path: build/scriptura-lite.app
           if-no-files-found: error
           retention-days: 14
 
@@ -338,7 +338,7 @@ jobs:
       - name: Download Windows executable
         uses: actions/download-artifact@v8
         with:
-          name: scriptura-windows-executable
+          name: scriptura-lite-windows-executable
           path: build/Release/
 
       - name: Install Qt
@@ -377,7 +377,7 @@ jobs:
           if (Test-Path "icon.ico") { Get-Item icon.ico | Format-List Name,Length }
 
       - name: Deploy Qt dependencies
-        run: windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw build/Release/scriptura.exe
+        run: windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw build/Release/scriptura-lite.exe
 
       - name: Package for installer
         shell: pwsh
@@ -385,7 +385,7 @@ jobs:
           $src = "build/Release"
           $dst = "deploy/Release"
           New-Item -ItemType Directory -Force -Path $dst | Out-Null
-          Copy-Item "$src/scriptura.exe" $dst
+          Copy-Item "$src/scriptura-lite.exe" $dst
           Get-ChildItem $src -Filter *.dll -ErrorAction SilentlyContinue | Copy-Item -Destination $dst
           foreach ($dir in @("platforms", "styles", "imageformats", "iconengines", "tls", "networkinformation")) {
             if (Test-Path "$src/$dir") { Copy-Item -Recurse -Force "$src/$dir" $dst }
@@ -428,34 +428,34 @@ jobs:
 
           Push-Location deploy/Release
           try {
-            $nsi = Get-Content "$env:GITHUB_WORKSPACE/deployment/windows/scriptura.nsi" -Raw
+            $nsi = Get-Content "$env:GITHUB_WORKSPACE/deployment/windows/scriptura-lite.nsi" -Raw
             $nsi = $nsi.Replace('0.0.0-dev', $env:APP_VERSION)
-            Set-Content -Path scriptura-temp.nsi -Value $nsi
+            Set-Content -Path scriptura-lite-temp.nsi -Value $nsi
 
-            & $makensis scriptura-temp.nsi
+            & $makensis scriptura-lite-temp.nsi
             if ($LASTEXITCODE -ne 0) { throw "makensis failed with exit code $LASTEXITCODE" }
-            if (-not (Test-Path "Scriptura-Setup.exe")) {
-              throw "makensis reported success but produced no Scriptura-Setup.exe"
+            if (-not (Test-Path "Scriptura-Lite-Setup.exe")) {
+              throw "makensis reported success but produced no Scriptura-Lite-Setup.exe"
             }
           } finally {
             Pop-Location
           }
 
       - name: Create portable ZIP
-        run: Compress-Archive -Path deploy/Release/* -DestinationPath Scriptura-Portable.zip
+        run: Compress-Archive -Path deploy/Release/* -DestinationPath Scriptura-Lite-Portable.zip
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-windows-installer
-          path: deploy/Release/Scriptura-Setup.exe
+          name: scriptura-lite-windows-installer
+          path: deploy/Release/Scriptura-Lite-Setup.exe
           if-no-files-found: error
           retention-days: 14
 
       - name: Upload Windows portable
         uses: actions/upload-artifact@v7
         with:
-          name: scriptura-windows-portable
-          path: Scriptura-Portable.zip
+          name: scriptura-lite-windows-portable
+          path: Scriptura-Lite-Portable.zip
           if-no-files-found: error
           retention-days: 14

@@ -33,7 +33,7 @@ curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh
 Or directly:
 
 ```bash
-./cmake-build-Debug/scriptura
+./cmake-build-Debug/scriptura-lite
 ```
 
 ---

@@ -15,7 +15,7 @@ echo === Packaging Scriptura for Windows (%BUILD_TYPE%) ===
 echo.
 
 REM Check if deploy-windows.bat has been run
-if not exist "%DEPLOY_DIR%\scriptura.exe" (
+if not exist "%DEPLOY_DIR%\scriptura-lite.exe" (
     echo ERROR: Deployment directory not found. Please run deploy-windows.bat first.
     pause
     exit /b 1
@@ -50,27 +50,27 @@ if "%VERSION%"=="" set VERSION=0.0.0-dev
 
 REM Update NSIS script with version
 echo Updating NSIS script with version: %VERSION%
-powershell -Command "(Get-Content 'scriptura.nsi') -replace '0\.0\.0-dev', '%VERSION%' | Set-Content 'scriptura-temp.nsi'"
+powershell -Command "(Get-Content 'scriptura-lite.nsi') -replace '0\.0\.0-dev', '%VERSION%' | Set-Content 'scriptura-lite-temp.nsi'"
 
 REM Build the installer
 echo.
 echo Building NSIS installer...
-makensis scriptura-temp.nsi
+makensis scriptura-lite-temp.nsi
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo ERROR: NSIS installer build failed
-    del scriptura-temp.nsi
+    del scriptura-lite-temp.nsi
     pause
     exit /b 1
 )
 
 REM Clean up temp file
-del scriptura-temp.nsi
+del scriptura-lite-temp.nsi
 
 echo.
 echo === Packaging complete ===
-echo Installer: Scriptura-Setup.exe
+echo Installer: Scriptura-Lite-Setup.exe
 echo.
 echo The installer is ready for distribution.
 echo.

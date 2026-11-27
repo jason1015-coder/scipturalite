@@ -83,8 +83,8 @@ CMakeLists.txt.user*
 *.Release
 
 # Binaries
-/scriptura
-scriptura.exe
+/scriptura-lite
+scriptura-lite.exe
 *.dll
 *.exe
 *.dylib
@@ -175,6 +175,6 @@ env/
 
 # Deployment
 /package/
-Scriptura-Setup.exe
+Scriptura-Lite-Setup.exe
 
 .harn/

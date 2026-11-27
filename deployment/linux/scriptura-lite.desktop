@@ -1,8 +1,8 @@
 [Desktop Entry]
-Name=Scriptura
+Name=Scriptura Lite
 Comment=A simple Qt-based text editor with project file browsing
-Exec=scriptura
-Icon=scriptura
+Exec=scriptura-lite
+Icon=scriptura-lite
 Terminal=false
 Type=Application
 Categories=Development;TextEditor;

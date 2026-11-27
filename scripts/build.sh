@@ -30,4 +30,4 @@ echo "Building C++ project..."
 cmake --build "$BUILD_DIR" -j$(nproc)
 
 echo
-echo "Build complete. Run with: ./$BUILD_DIR/scriptura"
+echo "Build complete. Run with: ./$BUILD_DIR/scriptura-lite"

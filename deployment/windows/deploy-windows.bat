@@ -61,12 +61,12 @@ if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"
 
 REM Copy the executable
 echo Copying executable...
-copy /Y "%BUILD_DIR%\scriptura.exe" "%DEPLOY_DIR%\"
+copy /Y "%BUILD_DIR%\scriptura-lite.exe" "%DEPLOY_DIR%\"
 
 REM Deploy Qt dependencies using windeployqt
 echo.
 echo Deploying Qt dependencies with windeployqt...
-windeployqt --%BUILD_TYPE% --no-translations --no-system-d3d-compiler --no-opengl-sw "%DEPLOY_DIR%\scriptura.exe"
+windeployqt --%BUILD_TYPE% --no-translations --no-system-d3d-compiler --no-opengl-sw "%DEPLOY_DIR%\scriptura-lite.exe"
 
 REM Copy additional resources
 echo.
@@ -88,6 +88,6 @@ echo.
 echo === Deployment complete ===
 echo Output directory: %DEPLOY_DIR%
 echo.
-echo To test the deployment, run: %DEPLOY_DIR%\scriptura.exe
+echo To test the deployment, run: %DEPLOY_DIR%\scriptura-lite.exe
 echo.
 pause

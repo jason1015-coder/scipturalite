@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(scriptura LANGUAGES CXX)
+project(scriptura-lite LANGUAGES CXX)
 
 # 版本號從 GitHub Release tag 注入，開發時預設為 0.0.0-dev
 if(DEFINED ENV{GITHUB_REF})
@@ -104,7 +104,7 @@ file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES CONFIGURE_DEPENDS
 )
 
 # The *.qrc glob above also picks up src/resources.qrc, which PROJECT_SOURCES
-# already compiles into the `scriptura` executable. Compiling it into both the
+# already compiles into the `scriptura-lite` executable. Compiling it into both the
 # executable and this static library embeds two copies of the data and runs the
 # resource initialiser twice per process. Keep exactly one copy: the executable
 # (PROJECT_SOURCES) and the test binary (tests/CMakeLists.txt). The C++ in
@@ -129,19 +129,19 @@ list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/rust_backend/")
 # the Rust backend.
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(scriptura
+    qt_add_executable(scriptura-lite
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
     )
-    qt_add_lupdate(scriptura TS_FILES)
-    qt_add_lrelease(scriptura TS_FILES ${TS_FILES})
+    qt_add_lupdate(scriptura-lite TS_FILES)
+    qt_add_lrelease(scriptura-lite TS_FILES ${TS_FILES})
 else()
     if(ANDROID)
-        add_library(scriptura SHARED
+        add_library(scriptura-lite SHARED
             ${PROJECT_SOURCES}
         )
     else()
-        add_executable(scriptura
+        add_executable(scriptura-lite
             ${PROJECT_SOURCES}
         )
     endif()
@@ -166,10 +166,10 @@ endforeach()
 file(APPEND ${I18N_QRC} "</qresource>\n</RCC>\n")
 
 if(QT_VERSION_MAJOR GREATER_EQUAL 6)
-    qt_add_resources(scriptura "i18n" PREFIX "/" ${I18N_QRC})
+    qt_add_resources(scriptura-lite "i18n" PREFIX "/" ${I18N_QRC})
 else()
     qt5_add_resources(scriptura_i18n ${I18N_QRC})
-    target_sources(scriptura PRIVATE ${I18N_QRC})
+    target_sources(scriptura-lite PRIVATE ${I18N_QRC})
 endif()
 
 add_library(scriptura_core STATIC ${SCRIPTURA_CORE_SOURCES})
@@ -196,7 +196,7 @@ if(WIN32)
     target_link_libraries(scriptura_core PRIVATE dwmapi)
     # Windows needs these Rust runtime libraries.
     # bcrypt is required for BCryptGenRandom (getrandom crate) and is inherited
-    # by every consumer of this static lib (scriptura, ...).
+    # by every consumer of this static lib (scriptura-lite, ...).
     target_link_libraries(scriptura_core PRIVATE bcrypt user32 advapi32 ws2_32 crypt32 userenv ntdll)
 endif()
 
@@ -236,14 +236,14 @@ target_include_directories(scriptura_core PUBLIC
 # (and the Apple linker already resolves circular references by default),
 # so only apply them on non-Apple platforms.
 if(APPLE)
-    target_link_libraries(scriptura PRIVATE
+    target_link_libraries(scriptura-lite PRIVATE
         scriptura_core
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Network
         "${RUST_LIB_REL_PATH}"
     )
 else()
-    target_link_libraries(scriptura PRIVATE
+    target_link_libraries(scriptura-lite PRIVATE
         scriptura_core
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Network
@@ -255,11 +255,11 @@ endif()
 
 if(WIN32)
     # Rust FFI needs bcrypt (BCryptGenRandom from getrandom crate), dwmapi, etc.
-    target_link_libraries(scriptura PRIVATE bcrypt dwmapi)
-    set_target_properties(scriptura PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+    target_link_libraries(scriptura-lite PRIVATE bcrypt dwmapi)
+    set_target_properties(scriptura-lite PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 endif()
 
-set_target_properties(scriptura PROPERTIES
+set_target_properties(scriptura-lite PROPERTIES
     ENABLE_EXPORTS ON
 )
 
@@ -272,33 +272,33 @@ set(BUNDLE_ID_OPTION "")
 if(${QT_VERSION} VERSION_LESS 6.1.0)
   set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.scriptura)
 endif()
-set_target_properties(scriptura PROPERTIES
+set_target_properties(scriptura-lite PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_INFO_PLIST "${INFO_PLIST_OUT}"
     MACOSX_BUNDLE_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/src/entitlements.plist"
-    MACOSX_BUNDLE_ICON_FILE "scriptura.icns"
+    MACOSX_BUNDLE_ICON_FILE "scriptura-lite.icns"
     WIN32_EXECUTABLE TRUE
 )
 
 include(GNUInstallDirs)
-install(TARGETS scriptura
+install(TARGETS scriptura-lite
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 # Desktop file for Linux
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deployment/linux/scriptura.desktop")
-    install(FILES deployment/linux/scriptura.desktop
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deployment/linux/scriptura-lite.desktop")
+    install(FILES deployment/linux/scriptura-lite.desktop
             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
     )
 endif()
 
 # Packaging support
-set(CPACK_PACKAGE_NAME "scriptura")
+set(CPACK_PACKAGE_NAME "scriptura-lite")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A simple Qt-based text editor with project file browsing")
-set(CPACK_PACKAGE_VENDOR "Scriptura")
+set(CPACK_PACKAGE_VENDOR "Scriptura Lite")
 set(CPACK_PACKAGE_CONTACT "maintainer@example.com")
 
 # Linux packaging
@@ -309,7 +309,7 @@ endif()
 # macOS DMG packaging
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
-    set(CPACK_DMG_VOLUME_NAME "Scriptura")
+    set(CPACK_DMG_VOLUME_NAME "Scriptura Lite")
     set(CPACK_DMG_FORMAT "UDBZ")
 endif()
 
@@ -323,7 +323,7 @@ if(WIN32)
     set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/deployment/windows/icon.ico")
     set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/deployment/windows/icon.ico")
     set(CPACK_NSIS_CREATE_ICONS_EXTRA "
-        CreateShortCut \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\${CPACK_PACKAGE_NAME}.lnk\" \"\$INSTDIR\\scriptura.exe\"
+        CreateShortCut \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\${CPACK_PACKAGE_NAME}.lnk\" \"\$INSTDIR\\scriptura-lite.exe\"
         CreateShortCut \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\Uninstall.lnk\" \"\$INSTDIR\\Uninstall.exe\"
     ")
     set(CPACK_NSIS_DELETE_ICONS_EXTRA "
@@ -337,5 +337,5 @@ endif()
 include(CPack)
 
 if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(scriptura)
+    qt_finalize_executable(scriptura-lite)
 endif()

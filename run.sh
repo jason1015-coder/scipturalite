@@ -30,8 +30,8 @@ echo "Building C++ project..."
 # Remove the previous executable up front so a fresh binary is ALWAYS linked
 # from the latest objects — even if CMake would otherwise consider it
 # up to date. Object compilation stays incremental, so this is fast.
-rm -f "$BUILD_DIR/scriptura" "$BUILD_DIR/scriptura.exe"
-rm -rf "$BUILD_DIR/scriptura.app"
+rm -f "$BUILD_DIR/scriptura-lite" "$BUILD_DIR/scriptura-lite.exe"
+rm -rf "$BUILD_DIR/scriptura-lite.app"
 
 if command -v nproc &>/dev/null; then
     cmake --build "$BUILD_DIR" -j$(nproc)
@@ -42,8 +42,8 @@ fi
 echo
 echo "Build complete. Launching Scriptura..."
 
-if [ -d "$BUILD_DIR/scriptura.app" ]; then
-    open "$BUILD_DIR/scriptura.app"
+if [ -d "$BUILD_DIR/scriptura-lite.app" ]; then
+    open "$BUILD_DIR/scriptura-lite.app"
 else
-    "$BUILD_DIR/scriptura"
+    "$BUILD_DIR/scriptura-lite"
 fi
