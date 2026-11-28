@@ -1,6 +1,7 @@
 # Scriptura Lite
 
 A lightweight Qt and Rust code editor — Qt for the UI, Rust for safe backend services.
+the editor I acturally use, since nov 26
 
 [![Build & Deploy Scriptura](https://github.com/jason1015-coder/scipturalite/actions/workflows/build.yml/badge.svg)](https://github.com/jason1015-coder/scipturalite/actions/workflows/build.yml)
 [![Run Unit Tests](https://github.com/jason1015-coder/scipturalite/actions/workflows/test.yml/badge.svg)](https://github.com/jason1015-coder/scipturalite/actions/workflows/test.yml)
